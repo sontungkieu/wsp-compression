@@ -53,6 +53,15 @@ python3 -B campaign.py --config runtime_config.json --root /absolute/new/campaig
 python3 -B inspect_campaign.py /absolute/new/campaign
 ```
 
+If a lane failed because its GPU acquired another compute process before any
+holdout job started, the frozen selection can be continued in a fresh output
+root. The worker waits for the original assigned GPU to be free and keeps the
+original deadline. It does not repeat the search or interrupt other processes.
+
+```bash
+python3 -B campaign.py --mode resume --lane 0 --resume-from /absolute/original/campaign/lane0 --root /absolute/new/continuation
+```
+
 The runtime configuration supplies `source`, `analysis_source`, two `lanes`
 containing `gpu` and `uuid`, local `models`, expected `model_sha256` mappings,
 `input_files` and `base_spec`. Consult `make_spec` in `campaign.py` and the

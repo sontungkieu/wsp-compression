@@ -68,7 +68,7 @@ def random_candidates(count=20):
     return choices
 
 
-def run_lane(root, lane):
+def run_lane(root, lane, resume_from=None):
     plan = json.loads((root / 'plan.json').read_text())
     config = plan['config']
     settings = config['lanes'][lane]
@@ -139,7 +139,21 @@ def run_lane(root, lane):
                 if file_hash(Path(model) / filename) != expected:
                     raise RuntimeError('model snapshot hash mismatch')
             verified_models.add(model)
-        device = device_status(gpu, settings['uuid'])
+        while True:
+            try:
+                device = device_status(gpu, settings['uuid'])
+                break
+            except RuntimeError as error:
+                if resume_from is None or str(error) != 'assigned GPU already has a compute process':
+                    raise
+                if cancelled:
+                    raise InterruptedError('user cancellation')
+                if plan['deadline_epoch'] - time.time() < 120:
+                    raise TimeoutError('eight-hour campaign budget exhausted while waiting for GPU')
+                progress['waiting_for_gpu'] = utc_now()
+                persist()
+                time.sleep(30)
+        progress.pop('waiting_for_gpu', None)
         remaining = plan['deadline_epoch'] - time.time()
         if remaining < 120:
             raise TimeoutError('eight-hour campaign budget exhausted before job admission')
@@ -196,57 +210,66 @@ def run_lane(root, lane):
                        lambada_n=0, arc_split='validation', arc_offset=0, arc_n=128))
 
     try:
-        baseline = validation('baseline', {'basis': 'ridge', 'gain': 1., 'profile': 'flat',
+        if resume_from is not None:
+            selection = json.loads((resume_from / 'selection.json').read_text())
+            if file_hash(resume_from / 'selection.json') != plan['selection_sha256']:
+                raise RuntimeError('frozen selection changed')
+            candidate = selection['candidate']
+            write_json(lane_root / 'selection.json', selection)
+        else:
+            candidate = None
+        if resume_from is None:
+            baseline = validation('baseline', {'basis': 'ridge', 'gain': 1., 'profile': 'flat',
                                           'mean_mix': 0., 'row_norm_cap': None})
-        if baseline is None:
-            raise RuntimeError('reference validation did not complete')
-        reference_nll = baseline['results']['candidate']['scores']['wiki_validation']['nll']
-        if lane == 0:
-            proposals = json.loads((root / 'agent_round1.json').read_text())
-            for index, proposal in enumerate(proposals):
-                validation('search_' + str(index).zfill(2), proposal['candidate'])
-            feedback = {'completed_at': utc_now(), 'jobs': [
-                {'id': label, 'candidate': result['spec']['candidate'],
-                 'scores': {name: {key: value for key, value in metrics.items() if key != 'records'}
-                            for name, metrics in result['results']['candidate']['scores'].items()}}
-                for label, result in records.items() if label.startswith('search_')]}
-            write_json(lane_root / 'round1_feedback.json', feedback)
-            # A fallback is pre-registered so the detached queue remains runnable
-            # after browser access ends. The exact consumed proposal file is saved.
-            round2_path = root / 'agent_round2.json'
-            waiting_since = time.monotonic()
-            while not round2_path.exists() and time.monotonic() - waiting_since < 180:
-                if cancelled or time.time() >= plan['deadline_epoch'] - 120:
-                    raise InterruptedError('campaign stopped while awaiting the next proposal batch')
-                time.sleep(2)
-            if not round2_path.exists():
-                round2_path = root / 'agent_round2_fallback.json'
-            round2 = json.loads(round2_path.read_text())
-            write_json(lane_root / 'round2_consumed.json', {'at': utc_now(), 'file': round2_path.name,
-                                                         'waiting_seconds': time.monotonic() - waiting_since,
-                                                         'sha256': file_hash(round2_path), 'proposals': round2})
-            for index, proposal in enumerate(round2, start=len(proposals)):
-                validation('search_' + str(index).zfill(2), proposal['candidate'])
-        else:
-            for index, candidate in enumerate(random_candidates()):
-                validation('search_' + str(index).zfill(2), candidate)
-        search_results = [(label, result) for label, result in records.items() if label.startswith('search_')]
-        feasible = []
-        for label, result in search_results:
-            scores = result['results']['candidate']['scores']
-            nll = scores['wiki_validation']['nll']
-            accuracy = scores['arc_easy']['accuracy_norm']
-            if math.isfinite(nll) and nll <= reference_nll + .02:
-                feasible.append((-accuracy, nll, label, result))
-        if feasible:
-            _, _, winner, winning_result = min(feasible, key=lambda item: item[:3])
-        else:
-            winner, winning_result = 'baseline', baseline
-        candidate = winning_result['spec']['candidate']
-        selection = {'frozen_at': utc_now(), 'winner': winner, 'candidate': candidate,
-                     'reference_nll': reference_nll, 'search_completed': len(search_results),
-                     'rule': 'maximize ARC validation length-normalized accuracy with Wiki NLL <= reference + 0.02'}
-        write_json(lane_root / 'selection.json', selection)
+            if baseline is None:
+                raise RuntimeError('reference validation did not complete')
+            reference_nll = baseline['results']['candidate']['scores']['wiki_validation']['nll']
+            if lane == 0:
+                proposals = json.loads((root / 'agent_round1.json').read_text())
+                for index, proposal in enumerate(proposals):
+                    validation('search_' + str(index).zfill(2), proposal['candidate'])
+                feedback = {'completed_at': utc_now(), 'jobs': [
+                    {'id': label, 'candidate': result['spec']['candidate'],
+                     'scores': {name: {key: value for key, value in metrics.items() if key != 'records'}
+                                for name, metrics in result['results']['candidate']['scores'].items()}}
+                    for label, result in records.items() if label.startswith('search_')]}
+                write_json(lane_root / 'round1_feedback.json', feedback)
+                # A fallback is pre-registered so the detached queue remains runnable
+                # after browser access ends. The exact consumed proposal file is saved.
+                round2_path = root / 'agent_round2.json'
+                waiting_since = time.monotonic()
+                while not round2_path.exists() and time.monotonic() - waiting_since < 180:
+                    if cancelled or time.time() >= plan['deadline_epoch'] - 120:
+                        raise InterruptedError('campaign stopped while awaiting the next proposal batch')
+                    time.sleep(2)
+                if not round2_path.exists():
+                    round2_path = root / 'agent_round2_fallback.json'
+                round2 = json.loads(round2_path.read_text())
+                write_json(lane_root / 'round2_consumed.json', {'at': utc_now(), 'file': round2_path.name,
+                                                             'waiting_seconds': time.monotonic() - waiting_since,
+                                                             'sha256': file_hash(round2_path), 'proposals': round2})
+                for index, proposal in enumerate(round2, start=len(proposals)):
+                    validation('search_' + str(index).zfill(2), proposal['candidate'])
+            else:
+                for index, candidate in enumerate(random_candidates()):
+                    validation('search_' + str(index).zfill(2), candidate)
+            search_results = [(label, result) for label, result in records.items() if label.startswith('search_')]
+            feasible = []
+            for label, result in search_results:
+                scores = result['results']['candidate']['scores']
+                nll = scores['wiki_validation']['nll']
+                accuracy = scores['arc_easy']['accuracy_norm']
+                if math.isfinite(nll) and nll <= reference_nll + .02:
+                    feasible.append((-accuracy, nll, label, result))
+            if feasible:
+                _, _, winner, winning_result = min(feasible, key=lambda item: item[:3])
+            else:
+                winner, winning_result = 'baseline', baseline
+            candidate = winning_result['spec']['candidate']
+            selection = {'frozen_at': utc_now(), 'winner': winner, 'candidate': candidate,
+                         'reference_nll': reference_nll, 'search_completed': len(search_results),
+                         'rule': 'maximize ARC validation length-normalized accuracy with Wiki NLL <= reference + 0.02'}
+            write_json(lane_root / 'selection.json', selection)
         # All holdout scoring starts only after the winner has been frozen.
         for offset, count in ((512, 256), (768, 256), (4352, 256), (4608, 256), (4864, 256)):
             run_job(f'holdout_lambada_{offset}', 'holdout', make_spec(candidate=candidate,
@@ -313,12 +336,44 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config')
     parser.add_argument('--root', required=True)
-    parser.add_argument('--mode', choices=['start', 'worker'], required=True)
+    parser.add_argument('--mode', choices=['start', 'worker', 'resume'], required=True)
     parser.add_argument('--lane', type=int)
+    parser.add_argument('--resume-from')
     args = parser.parse_args()
     root = Path(args.root).resolve()
     if args.mode == 'worker':
-        run_lane(root, args.lane)
+        run_lane(root, args.lane, Path(args.resume_from).resolve() if args.resume_from else None)
+        return
+    if args.mode == 'resume':
+        if args.lane is None or not args.resume_from:
+            raise SystemExit('resume requires lane and the original lane directory')
+        original = Path(args.resume_from).resolve()
+        if original.name != 'lane' + str(args.lane):
+            raise SystemExit('original lane path mismatch')
+        plan = json.loads((original.parent / 'plan.json').read_text())
+        progress = json.loads((original / 'progress.json').read_text())
+        if progress['status'] != 'failed' or progress.get('error') != 'RuntimeError: assigned GPU already has a compute process':
+            raise SystemExit('resume requires a GPU-busy failure')
+        if any(job['stage'] != 'validation_search' for job in progress['jobs']):
+            raise SystemExit('resume only supports failure before holdout')
+        if plan['deadline_epoch'] - time.time() < 120 or root.exists():
+            raise SystemExit('original budget exhausted or output root already exists')
+        plan['original_queue_sha256'] = plan['queue_sha256']
+        plan['queue_sha256'] = file_hash(__file__)
+        plan['selection_sha256'] = file_hash(original / 'selection.json')
+        plan['resumed_from'] = str(original)
+        root.mkdir()
+        (root / ('lane' + str(args.lane))).mkdir()
+        write_json(root / 'plan.json', plan)
+        with (root / ('lane' + str(args.lane)) / 'supervisor.log').open('x') as log:
+            child = subprocess.Popen([sys.executable, '-B', str(Path(__file__).resolve()), '--root',
+                                      str(root), '--mode', 'worker', '--lane', str(args.lane),
+                                      '--resume-from', str(original)], stdout=log, stderr=subprocess.STDOUT,
+                                     start_new_session=True)
+        receipt = {'started_at': utc_now(), 'lane': args.lane, 'pid': child.pid,
+                   'deadline_utc': plan['deadline_utc'], 'resumed_from': str(original)}
+        write_json(root / 'launch.json', receipt)
+        print(json.dumps(receipt))
         return
     config = json.loads(Path(args.config).read_text())
     if root.exists():
