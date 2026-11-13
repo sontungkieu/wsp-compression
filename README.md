@@ -19,6 +19,8 @@ family, selection rule, reserved data regions and resource limits.
 - `campaign.py` launches two detached GPU workers with a shared eight-hour deadline.
 - `analyze.py` computes paired document-bootstrap intervals for reserved test shards.
 - `inspect_campaign.py` reads compact progress and verifies result hashes.
+- `stage_data.py` downloads pinned LAMBADA and ARC-Easy files and verifies hashes.
+- `runtime_config.example.json` shows all runtime configuration fields with portable example paths.
 - `agent_round1.json` contains twelve initial Codex proposals and their rationales.
 - `agent_round2_fallback.json` contains eight fallback proposals. A live feedback-based
   batch can be supplied as `agent_round2.json` in the campaign output directory.
@@ -55,6 +57,10 @@ The runtime configuration supplies `source`, `analysis_source`, two `lanes`
 containing `gpu` and `uuid`, local `models`, expected `model_sha256` mappings,
 `input_files` and `base_spec`. Consult `make_spec` in `campaign.py` and the
 specification reads in `recovery.py` for all experiment fields.
+
+The earlier one-GPU campaign completed all 82 planned conditions in about
+3 hours 15 minutes with zero failed jobs. Its recovered metric summary is
+available in `night6h_result_summary.json`.
 
 ## Interpretation
 

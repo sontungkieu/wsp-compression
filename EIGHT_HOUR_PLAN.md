@@ -78,6 +78,9 @@ these scores are explicitly identified by their recorded custom protocols.
 7. Spend remaining budget on larger paired test evaluations across calibration
    offsets 0, 4096 and 8192. Each job has a bounded timeout and retains completed
    arms when a later arm reaches the deadline.
+8. If budget remains, measure the frozen candidate's sensitivity to ridge
+   regularizers 0.01, 0.1 and 10 on the three checkpoints. These diagnostic
+   comparisons retain the previously selected candidate structure.
 
 Comparisons always include the dense model, pruning alone, mean compensation,
 ridge, affine ridge and the selected candidate. Qwen2.5-7B-Instruct differs in

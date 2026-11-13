@@ -1,0 +1,80 @@
+{
+  "source": "/absolute/source/recovery.py",
+  "analysis_source": "/absolute/source/analyze.py",
+  "git_commit": "REPLACE_WITH_SOURCE_COMMIT",
+  "lanes": [
+    {
+      "gpu": 0,
+      "uuid": "REPLACE_WITH_GPU_0_UUID"
+    },
+    {
+      "gpu": 1,
+      "uuid": "REPLACE_WITH_GPU_1_UUID"
+    }
+  ],
+  "models": {
+    "q15": "/models/Qwen2.5-1.5B",
+    "q05": "/models/qwen25-0p5b-060db64-retry1",
+    "q7i": "/models/Qwen2.5-7B-Instruct"
+  },
+  "model_sha256": {
+    "/models/Qwen2.5-1.5B": {
+      "model.safetensors": "a961db72e75d52b18e6b0c9d379e51a26973b233385e0e127fdda7d648aec796"
+    },
+    "/models/qwen25-0p5b-060db64-retry1": {
+      "model.safetensors": "88c142557820ccad55bb59756bfcfcf891de9cc6202816bd346445188a0ed342"
+    },
+    "/models/Qwen2.5-7B-Instruct": {
+      "model-00001-of-00004.safetensors": "a1333e6293854747c481288ea83b348226af178dd565c49b6f9495ba1966aba7",
+      "model-00002-of-00004.safetensors": "f5d25a2772cb825164a2a2c0fb6d51a87e282abf21e4dd75bc5cfb3cd0ea6185",
+      "model-00003-of-00004.safetensors": "8efdec4c1bc12317ae1a38dc42b595ce777738a64deea3fcb8a0a91381bcdfd5",
+      "model-00004-of-00004.safetensors": "1a72d403cdf0c1ec3cb7f289f17b394a01e64394c2e9b3c0f94dbce3faf879bd"
+    }
+  },
+  "input_files": [
+    "/datasets/evaluation/manifest.json",
+    "/datasets/evaluation/lambada.jsonl",
+    "/datasets/evaluation/arc_validation.jsonl",
+    "/datasets/evaluation/arc_test.jsonl",
+    "/datasets/wikitext2/train.txt",
+    "/datasets/wikitext2/validation.txt",
+    "/datasets/wikitext2/test.txt"
+  ],
+  "base_spec": {
+    "model": "/models/Qwen2.5-1.5B",
+    "train": "/datasets/wikitext2/train.txt",
+    "wiki_validation": "/datasets/wikitext2/validation.txt",
+    "wiki_test": "/datasets/wikitext2/test.txt",
+    "data_dir": "/datasets/evaluation",
+    "remove_fraction": 0.5,
+    "context": 512,
+    "cal_context": 256,
+    "mask_offset": 0,
+    "mask_windows": 16,
+    "mask_metric": "energy",
+    "fit_offset": 0,
+    "fit_windows": 16,
+    "local_hold_offset": 60000,
+    "local_hold_windows": 4,
+    "ridge_lambda": 1.0,
+    "gain": 1.0,
+    "dtype": "float32",
+    "wiki_offset": 140000,
+    "wiki_validation_windows": 0,
+    "wiki_test_windows": 64,
+    "lambada_offset": 1024,
+    "lambada_n": 128,
+    "arc_split": "test",
+    "arc_offset": 0,
+    "arc_n": 64,
+    "methods": [
+      "original",
+      "drop",
+      "mean",
+      "ridge",
+      "affine",
+      "candidate"
+    ],
+    "gpu": 0
+  }
+}

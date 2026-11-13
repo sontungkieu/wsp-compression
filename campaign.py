@@ -140,6 +140,9 @@ def run_lane(root, lane):
                     raise RuntimeError('model snapshot hash mismatch')
             verified_models.add(model)
         device = device_status(gpu, settings['uuid'])
+        remaining = plan['deadline_epoch'] - time.time()
+        if remaining < 120:
+            raise TimeoutError('eight-hour campaign budget exhausted before job admission')
         folder = lane_root / label
         folder.mkdir(exist_ok=False)
         write_json(folder / 'spec.json', specification)
@@ -285,6 +288,15 @@ def run_lane(root, lane):
                     run_job(f'extended_{model_name}_{fraction}_{fit_offset}', 'extended',
                             make_spec(candidate=candidate, model=model_path, remove_fraction=fraction,
                                       fit_offset=fit_offset, lambada_offset=4352, lambada_n=801,
+                                      arc_offset=1664, arc_n=712), timeout=2400)
+        # Spare budget measures transfer sensitivity to fitting regularization.
+        # The previously selected candidate remains frozen across this grid.
+        for model_name, model_path in config['models'].items():
+            for fraction in (.25, .5):
+                for regularizer in (.01, .1, 10.):
+                    run_job(f'regularization_{model_name}_{fraction}_{regularizer}', 'regularization',
+                            make_spec(candidate=candidate, model=model_path, remove_fraction=fraction,
+                                      ridge_lambda=regularizer, lambada_offset=4352, lambada_n=801,
                                       arc_offset=1664, arc_n=712), timeout=2400)
         progress['status'] = 'completed_all_planned'
     except TimeoutError as error:

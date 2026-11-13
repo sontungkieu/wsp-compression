@@ -70,6 +70,7 @@ def main():
     output = Path(a.output)
     if output.exists():
         raise SystemExit('fresh output required')
+    output.parent.mkdir(parents=True, exist_ok=True)
     if os.environ.get('CUDA_VISIBLE_DEVICES') != str(cfg['gpu']):
         raise SystemExit('CUDA device differs from the assigned device in the spec')
     started = time.monotonic()

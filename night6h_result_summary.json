@@ -1,0 +1,5807 @@
+{
+  "status": "completed_all_planned",
+  "started_at": "2026-11-12T19:17:31.714809+00:00",
+  "finished_at": "2026-11-12T22:32:41.850498+00:00",
+  "deadline_utc": "2026-11-13T01:17:31.536968+00:00",
+  "error": null,
+  "completed": 82,
+  "failed": [],
+  "jobs": [
+    {
+      "id": "val_c0_l0.01",
+      "seconds": 24.805613171309233,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.716236248874851,
+            "perplexity": 15.123294676132668
+          }
+        },
+        "drop": {
+          "wiki_validation": {
+            "nll": 3.8515676696239853,
+            "perplexity": 47.066790604327515
+          }
+        },
+        "mean": {
+          "wiki_validation": {
+            "nll": 3.866803891504814,
+            "perplexity": 47.78940162108195
+          }
+        },
+        "ridge": {
+          "wiki_validation": {
+            "nll": 4.023129550911443,
+            "perplexity": 55.875698328868374
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 4.024294074967416,
+            "perplexity": 55.94080482539967
+          }
+        }
+      }
+    },
+    {
+      "id": "val_c0_l0.1",
+      "seconds": 23.98239646665752,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.716236248874851,
+            "perplexity": 15.123294676132668
+          }
+        },
+        "drop": {
+          "wiki_validation": {
+            "nll": 3.8515676696239853,
+            "perplexity": 47.066790604327515
+          }
+        },
+        "mean": {
+          "wiki_validation": {
+            "nll": 3.866803891504814,
+            "perplexity": 47.78940162108195
+          }
+        },
+        "ridge": {
+          "wiki_validation": {
+            "nll": 3.6867461941713455,
+            "perplexity": 39.91476055357029
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 3.691037135114875,
+            "perplexity": 40.0864004187882
+          }
+        }
+      }
+    },
+    {
+      "id": "val_c0_l1",
+      "seconds": 24.642490226775408,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.716236248874851,
+            "perplexity": 15.123294676132668
+          }
+        },
+        "drop": {
+          "wiki_validation": {
+            "nll": 3.8515676696239853,
+            "perplexity": 47.066790604327515
+          }
+        },
+        "mean": {
+          "wiki_validation": {
+            "nll": 3.866803891504814,
+            "perplexity": 47.78940162108195
+          }
+        },
+        "ridge": {
+          "wiki_validation": {
+            "nll": 3.6355999687179894,
+            "perplexity": 37.92459964622087
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 3.6420595053357387,
+            "perplexity": 38.17036790631822
+          }
+        }
+      }
+    },
+    {
+      "id": "val_c4096_l0.01",
+      "seconds": 24.113104255869985,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.716236248874851,
+            "perplexity": 15.123294676132668
+          }
+        },
+        "drop": {
+          "wiki_validation": {
+            "nll": 3.8515676696239853,
+            "perplexity": 47.066790604327515
+          }
+        },
+        "mean": {
+          "wiki_validation": {
+            "nll": 3.8407653987757615,
+            "perplexity": 46.56109861257711
+          }
+        },
+        "ridge": {
+          "wiki_validation": {
+            "nll": 4.266144422169067,
+            "perplexity": 71.24640930567774
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 4.22997601204889,
+            "perplexity": 68.71558380801117
+          }
+        }
+      }
+    },
+    {
+      "id": "val_c4096_l0.1",
+      "seconds": 25.218142019584775,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.716236248874851,
+            "perplexity": 15.123294676132668
+          }
+        },
+        "drop": {
+          "wiki_validation": {
+            "nll": 3.8515676696239853,
+            "perplexity": 47.066790604327515
+          }
+        },
+        "mean": {
+          "wiki_validation": {
+            "nll": 3.8407653987757615,
+            "perplexity": 46.56109861257711
+          }
+        },
+        "ridge": {
+          "wiki_validation": {
+            "nll": 3.6628703511157847,
+            "perplexity": 38.97304881114394
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 3.664056177008642,
+            "perplexity": 39.019291474002465
+          }
+        }
+      }
+    },
+    {
+      "id": "val_c4096_l1",
+      "seconds": 24.41754095070064,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.716236248874851,
+            "perplexity": 15.123294676132668
+          }
+        },
+        "drop": {
+          "wiki_validation": {
+            "nll": 3.8515676696239853,
+            "perplexity": 47.066790604327515
+          }
+        },
+        "mean": {
+          "wiki_validation": {
+            "nll": 3.8407653987757615,
+            "perplexity": 46.56109861257711
+          }
+        },
+        "ridge": {
+          "wiki_validation": {
+            "nll": 3.580293364254229,
+            "perplexity": 35.88406640545573
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 3.5868446812937638,
+            "perplexity": 36.11992605322434
+          }
+        }
+      }
+    },
+    {
+      "id": "val_c8192_l0.01",
+      "seconds": 24.32647398300469,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.716236248874851,
+            "perplexity": 15.123294676132668
+          }
+        },
+        "drop": {
+          "wiki_validation": {
+            "nll": 3.8515676696239853,
+            "perplexity": 47.066790604327515
+          }
+        },
+        "mean": {
+          "wiki_validation": {
+            "nll": 3.83859822521471,
+            "perplexity": 46.460301892134716
+          }
+        },
+        "ridge": {
+          "wiki_validation": {
+            "nll": 4.370053793352877,
+            "perplexity": 79.04788383590447
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 4.335565279607904,
+            "perplexity": 76.36811602937847
+          }
+        }
+      }
+    },
+    {
+      "id": "val_c8192_l0.1",
+      "seconds": 24.415097078308463,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.716236248874851,
+            "perplexity": 15.123294676132668
+          }
+        },
+        "drop": {
+          "wiki_validation": {
+            "nll": 3.8515676696239853,
+            "perplexity": 47.066790604327515
+          }
+        },
+        "mean": {
+          "wiki_validation": {
+            "nll": 3.83859822521471,
+            "perplexity": 46.460301892134716
+          }
+        },
+        "ridge": {
+          "wiki_validation": {
+            "nll": 3.700349259049925,
+            "perplexity": 40.46143341436664
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 3.7048414047450233,
+            "perplexity": 40.64360092345695
+          }
+        }
+      }
+    },
+    {
+      "id": "val_c8192_l1",
+      "seconds": 24.329305835068226,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.716236248874851,
+            "perplexity": 15.123294676132668
+          }
+        },
+        "drop": {
+          "wiki_validation": {
+            "nll": 3.8515676696239853,
+            "perplexity": 47.066790604327515
+          }
+        },
+        "mean": {
+          "wiki_validation": {
+            "nll": 3.83859822521471,
+            "perplexity": 46.460301892134716
+          }
+        },
+        "ridge": {
+          "wiki_validation": {
+            "nll": 3.6149410650921427,
+            "perplexity": 37.14915647901567
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 3.6085393498788374,
+            "perplexity": 36.912097759621346
+          }
+        }
+      }
+    },
+    {
+      "id": "confirm_c0_l1",
+      "seconds": 188.03717919439077,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.2516273760617387,
+            "perplexity": 25.832344668491494,
+            "last_word_accuracy": 0.619140625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.73828125,
+            "accuracy_norm": 0.6875
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.5122895038981365,
+            "perplexity": 91.13022284867239,
+            "last_word_accuracy": 0.220703125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.390625,
+            "accuracy_norm": 0.3359375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.646411171631337,
+            "perplexity": 38.3368345507716
+          },
+          "lambada": {
+            "nll": 4.500432288643283,
+            "perplexity": 90.05605309620292,
+            "last_word_accuracy": 0.25
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.36328125
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.4713313518904894,
+            "perplexity": 32.17955625135838
+          },
+          "lambada": {
+            "nll": 4.321024450848593,
+            "perplexity": 75.26569481477358,
+            "last_word_accuracy": 0.302734375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3828125,
+            "accuracy_norm": 0.359375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.478872388776268,
+            "perplexity": 32.423140757560496
+          },
+          "lambada": {
+            "nll": 4.3371172920690215,
+            "perplexity": 76.48673232025924,
+            "last_word_accuracy": 0.306640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.37109375,
+            "accuracy_norm": 0.3515625
+          }
+        }
+      }
+    },
+    {
+      "id": "confirm_c4096_l1",
+      "seconds": 195.2918553724885,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.2516273760617387,
+            "perplexity": 25.832344668491494,
+            "last_word_accuracy": 0.619140625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.73828125,
+            "accuracy_norm": 0.6875
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.5122895038981365,
+            "perplexity": 91.13022284867239,
+            "last_word_accuracy": 0.220703125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.390625,
+            "accuracy_norm": 0.3359375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.6270786479494577,
+            "perplexity": 37.60280497263644
+          },
+          "lambada": {
+            "nll": 4.493365669106432,
+            "perplexity": 89.42190451432084,
+            "last_word_accuracy": 0.228515625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3828125,
+            "accuracy_norm": 0.34765625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.4204636627913922,
+            "perplexity": 30.583592207813105
+          },
+          "lambada": {
+            "nll": 4.3013403359734115,
+            "perplexity": 73.79864241477033,
+            "last_word_accuracy": 0.248046875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.36328125,
+            "accuracy_norm": 0.359375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.4241060081526724,
+            "perplexity": 30.695191330917574
+          },
+          "lambada": {
+            "nll": 4.320757701210228,
+            "perplexity": 75.24562039544156,
+            "last_word_accuracy": 0.240234375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.35546875,
+            "accuracy_norm": 0.35546875
+          }
+        }
+      }
+    },
+    {
+      "id": "confirm_c8192_l1",
+      "seconds": 196.6340769547969,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.2516273760617387,
+            "perplexity": 25.832344668491494,
+            "last_word_accuracy": 0.619140625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.73828125,
+            "accuracy_norm": 0.6875
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.5122895038981365,
+            "perplexity": 91.13022284867239,
+            "last_word_accuracy": 0.220703125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.390625,
+            "accuracy_norm": 0.3359375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.628594751227392,
+            "perplexity": 37.65985794668711
+          },
+          "lambada": {
+            "nll": 4.485986012911012,
+            "perplexity": 88.76443055236017,
+            "last_word_accuracy": 0.2109375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.37109375,
+            "accuracy_norm": 0.34765625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.4357492891076493,
+            "perplexity": 31.05467277818213
+          },
+          "lambada": {
+            "nll": 4.309560013602239,
+            "perplexity": 74.40774334210617,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.34375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.4411111783141495,
+            "perplexity": 31.221631700581273
+          },
+          "lambada": {
+            "nll": 4.32705668884972,
+            "perplexity": 75.72108753696091,
+            "last_word_accuracy": 0.244140625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.3515625
+          }
+        }
+      }
+    },
+    {
+      "id": "size_r0.25_t256",
+      "seconds": 72.19286106526852,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.965105564393643,
+            "perplexity": 19.396750739628466
+          },
+          "lambada": {
+            "nll": 3.7113645113922753,
+            "perplexity": 40.90959006139301,
+            "last_word_accuracy": 0.4609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.515625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.950653587535403,
+            "perplexity": 19.118445223138416
+          },
+          "lambada": {
+            "nll": 3.7011611314202573,
+            "perplexity": 40.494296272638024,
+            "last_word_accuracy": 0.4609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.46875,
+            "accuracy_norm": 0.484375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.945648107510024,
+            "perplexity": 19.022987333045442
+          },
+          "lambada": {
+            "nll": 3.6935616285965334,
+            "perplexity": 40.1877261195712,
+            "last_word_accuracy": 0.4609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.453125,
+            "accuracy_norm": 0.484375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.9461590156629827,
+            "perplexity": 19.032708815548396
+          },
+          "lambada": {
+            "nll": 3.695226105908239,
+            "perplexity": 40.254673378546734,
+            "last_word_accuracy": 0.484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.5
+          }
+        }
+      }
+    },
+    {
+      "id": "size_r0.25_t1024",
+      "seconds": 72.42838666215539,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.965105564393643,
+            "perplexity": 19.396750739628466
+          },
+          "lambada": {
+            "nll": 3.7113645113922753,
+            "perplexity": 40.90959006139301,
+            "last_word_accuracy": 0.4609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.515625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.9543699089095083,
+            "perplexity": 19.18962769630874
+          },
+          "lambada": {
+            "nll": 3.706262460572707,
+            "perplexity": 40.70139880669026,
+            "last_word_accuracy": 0.4609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.453125,
+            "accuracy_norm": 0.484375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.942850112915039,
+            "perplexity": 18.96983551123831
+          },
+          "lambada": {
+            "nll": 3.691843048603425,
+            "perplexity": 40.11871961108035,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.5
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.943014327793905,
+            "perplexity": 18.972950896268184
+          },
+          "lambada": {
+            "nll": 3.6926449277454108,
+            "perplexity": 40.150902877360124,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.5,
+            "accuracy_norm": 0.515625
+          }
+        }
+      }
+    },
+    {
+      "id": "size_r0.25_t4096",
+      "seconds": 72.73415965586901,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.965105564393643,
+            "perplexity": 19.396750739628466
+          },
+          "lambada": {
+            "nll": 3.7113645113922753,
+            "perplexity": 40.90959006139301,
+            "last_word_accuracy": 0.4609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.515625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.9485933636032673,
+            "perplexity": 19.07909749123165
+          },
+          "lambada": {
+            "nll": 3.698191840042189,
+            "perplexity": 40.37423524415484,
+            "last_word_accuracy": 0.453125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.46875,
+            "accuracy_norm": 0.484375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.93553442684405,
+            "perplexity": 18.8315645400084
+          },
+          "lambada": {
+            "nll": 3.695943417478783,
+            "perplexity": 40.28355888024337,
+            "last_word_accuracy": 0.484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.53125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.936379315101937,
+            "perplexity": 18.847481830985156
+          },
+          "lambada": {
+            "nll": 3.697067252759144,
+            "perplexity": 40.32885641364698,
+            "last_word_accuracy": 0.484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.46875,
+            "accuracy_norm": 0.53125
+          }
+        }
+      }
+    },
+    {
+      "id": "size_r0.25_t8192",
+      "seconds": 77.70397874712944,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.965105564393643,
+            "perplexity": 19.396750739628466
+          },
+          "lambada": {
+            "nll": 3.7113645113922753,
+            "perplexity": 40.90959006139301,
+            "last_word_accuracy": 0.4609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.515625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.94185145353851,
+            "perplexity": 18.95090056348904
+          },
+          "lambada": {
+            "nll": 3.6959389916795486,
+            "perplexity": 40.283380593693856,
+            "last_word_accuracy": 0.453125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.453125,
+            "accuracy_norm": 0.484375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.92999493772503,
+            "perplexity": 18.727535692497764
+          },
+          "lambada": {
+            "nll": 3.7017328147173703,
+            "perplexity": 40.51745280391584,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.421875,
+            "accuracy_norm": 0.46875
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.9295925244893115,
+            "perplexity": 18.72000100039431
+          },
+          "lambada": {
+            "nll": 3.7007408960351786,
+            "perplexity": 40.47728271155098,
+            "last_word_accuracy": 0.4609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.421875,
+            "accuracy_norm": 0.453125
+          }
+        }
+      }
+    },
+    {
+      "id": "size_r0.5_t256",
+      "seconds": 66.97625274769962,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.527549611932129,
+            "perplexity": 92.53154486335141,
+            "last_word_accuracy": 0.203125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.40625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.6808995248753495,
+            "perplexity": 39.682073034910076
+          },
+          "lambada": {
+            "nll": 4.562075132853169,
+            "perplexity": 95.78203419137013,
+            "last_word_accuracy": 0.234375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.328125,
+            "accuracy_norm": 0.390625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.623537806382151,
+            "perplexity": 37.46989484346108
+          },
+          "lambada": {
+            "nll": 4.447987065400565,
+            "perplexity": 85.45475592378583,
+            "last_word_accuracy": 0.25
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3125,
+            "accuracy_norm": 0.40625
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.675114726833635,
+            "perplexity": 39.453182936319294
+          },
+          "lambada": {
+            "nll": 4.493055341432592,
+            "perplexity": 89.3941587280679,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.28125,
+            "accuracy_norm": 0.390625
+          }
+        }
+      }
+    },
+    {
+      "id": "size_r0.5_t1024",
+      "seconds": 66.92489001527429,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.527549611932129,
+            "perplexity": 92.53154486335141,
+            "last_word_accuracy": 0.203125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.40625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.678522793047582,
+            "perplexity": 39.58787137931702
+          },
+          "lambada": {
+            "nll": 4.54379822971607,
+            "perplexity": 94.04733597451813,
+            "last_word_accuracy": 0.234375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3125,
+            "accuracy_norm": 0.40625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.546925132288625,
+            "perplexity": 34.70643554985556
+          },
+          "lambada": {
+            "nll": 4.3997415301315055,
+            "perplexity": 81.4298187901519,
+            "last_word_accuracy": 0.234375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.359375,
+            "accuracy_norm": 0.34375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.5529628873104686,
+            "perplexity": 34.91661838310695
+          },
+          "lambada": {
+            "nll": 4.421039121076379,
+            "perplexity": 83.18267733791816,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.34375,
+            "accuracy_norm": 0.4375
+          }
+        }
+      }
+    },
+    {
+      "id": "size_r0.5_t4096",
+      "seconds": 68.04897314868867,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.527549611932129,
+            "perplexity": 92.53154486335141,
+            "last_word_accuracy": 0.203125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.40625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.646411171631337,
+            "perplexity": 38.3368345507716
+          },
+          "lambada": {
+            "nll": 4.518444922250523,
+            "perplexity": 91.69289746708314,
+            "last_word_accuracy": 0.2265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.34375,
+            "accuracy_norm": 0.390625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.5275240224401543,
+            "perplexity": 34.03958194830586
+          },
+          "lambada": {
+            "nll": 4.413780893355941,
+            "perplexity": 82.5811043413007,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.296875,
+            "accuracy_norm": 0.375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.532277180024089,
+            "perplexity": 34.201762575096716
+          },
+          "lambada": {
+            "nll": 4.425835161088363,
+            "perplexity": 83.58258300196552,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3125,
+            "accuracy_norm": 0.359375
+          }
+        }
+      }
+    },
+    {
+      "id": "size_r0.5_t8192",
+      "seconds": 71.41125865653157,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.527549611932129,
+            "perplexity": 92.53154486335141,
+            "last_word_accuracy": 0.203125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.40625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.629821075618617,
+            "perplexity": 37.706069478430116
+          },
+          "lambada": {
+            "nll": 4.504571577588846,
+            "perplexity": 90.42959368413369,
+            "last_word_accuracy": 0.2421875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.34375,
+            "accuracy_norm": 0.390625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.4721326772014223,
+            "perplexity": 32.20535287864199
+          },
+          "lambada": {
+            "nll": 4.399550906232527,
+            "perplexity": 81.41429779998383,
+            "last_word_accuracy": 0.234375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.359375,
+            "accuracy_norm": 0.453125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.4708436454578857,
+            "perplexity": 32.163865901229606
+          },
+          "lambada": {
+            "nll": 4.406582014772998,
+            "perplexity": 81.9887477078248,
+            "last_word_accuracy": 0.2421875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.359375,
+            "accuracy_norm": 0.453125
+          }
+        }
+      }
+    },
+    {
+      "id": "mask_r0.1_energy",
+      "seconds": 73.39650361984968,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.661385765747548,
+            "perplexity": 14.316114139686402
+          },
+          "lambada": {
+            "nll": 3.4043448786362824,
+            "perplexity": 30.094573666311728,
+            "last_word_accuracy": 0.53125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.59375,
+            "accuracy_norm": 0.703125
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.656682406386284,
+            "perplexity": 14.248938409865548
+          },
+          "lambada": {
+            "nll": 3.401192577585985,
+            "perplexity": 29.99985587806107,
+            "last_word_accuracy": 0.53125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.609375,
+            "accuracy_norm": 0.703125
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.6525122610790155,
+            "perplexity": 14.189641989497579
+          },
+          "lambada": {
+            "nll": 3.401863819013346,
+            "perplexity": 30.019999784097067,
+            "last_word_accuracy": 0.546875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.609375,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.6522801636249818,
+            "perplexity": 14.18634899188113
+          },
+          "lambada": {
+            "nll": 3.4011823752565813,
+            "perplexity": 29.999549811210645,
+            "last_word_accuracy": 0.546875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.609375,
+            "accuracy_norm": 0.71875
+          }
+        }
+      }
+    },
+    {
+      "id": "mask_r0.1_variance",
+      "seconds": 73.84516942314804,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.6958219860397907,
+            "perplexity": 14.817693686141698
+          },
+          "lambada": {
+            "nll": 3.4443552197429117,
+            "perplexity": 31.32308043026364,
+            "last_word_accuracy": 0.5625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.609375,
+            "accuracy_norm": 0.6875
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.664859698943196,
+            "perplexity": 14.365933848896866
+          },
+          "lambada": {
+            "nll": 3.424215071094302,
+            "perplexity": 30.69853922134007,
+            "last_word_accuracy": 0.5390625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.640625,
+            "accuracy_norm": 0.703125
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.670882915564013,
+            "perplexity": 14.452724096269886
+          },
+          "lambada": {
+            "nll": 3.4229166083372298,
+            "perplexity": 30.658704179220795,
+            "last_word_accuracy": 0.5546875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.59375,
+            "accuracy_norm": 0.6875
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.6682628306857294,
+            "perplexity": 14.414906296971726
+          },
+          "lambada": {
+            "nll": 3.42182925077516,
+            "perplexity": 30.625385323426034,
+            "last_word_accuracy": 0.5546875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.59375,
+            "accuracy_norm": 0.6875
+          }
+        }
+      }
+    },
+    {
+      "id": "mask_r0.25_energy",
+      "seconds": 70.44502859190106,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.965105564393643,
+            "perplexity": 19.396750739628466
+          },
+          "lambada": {
+            "nll": 3.7113645113922753,
+            "perplexity": 40.90959006139301,
+            "last_word_accuracy": 0.4609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.515625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.9485933636032673,
+            "perplexity": 19.07909749123165
+          },
+          "lambada": {
+            "nll": 3.698191840042189,
+            "perplexity": 40.37423524415484,
+            "last_word_accuracy": 0.453125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.46875,
+            "accuracy_norm": 0.484375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.93553442684405,
+            "perplexity": 18.8315645400084
+          },
+          "lambada": {
+            "nll": 3.695943417478783,
+            "perplexity": 40.28355888024337,
+            "last_word_accuracy": 0.484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.53125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.936379315101937,
+            "perplexity": 18.847481830985156
+          },
+          "lambada": {
+            "nll": 3.697067252759144,
+            "perplexity": 40.32885641364698,
+            "last_word_accuracy": 0.484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.46875,
+            "accuracy_norm": 0.53125
+          }
+        }
+      }
+    },
+    {
+      "id": "mask_r0.25_variance",
+      "seconds": 72.36351296491921,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.0220934948109366,
+            "perplexity": 20.534235032157195
+          },
+          "lambada": {
+            "nll": 3.747117078764563,
+            "perplexity": 42.39867360147729,
+            "last_word_accuracy": 0.4765625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.4375,
+            "accuracy_norm": 0.5
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.9700112128211096,
+            "perplexity": 19.49213815666397
+          },
+          "lambada": {
+            "nll": 3.71270890059775,
+            "perplexity": 40.96462545887992,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.453125,
+            "accuracy_norm": 0.484375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.957909529922993,
+            "perplexity": 19.25767206033041
+          },
+          "lambada": {
+            "nll": 3.7063545928760293,
+            "perplexity": 40.705148893060155,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.46875,
+            "accuracy_norm": 0.5
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.955158390410959,
+            "perplexity": 19.204764329460417
+          },
+          "lambada": {
+            "nll": 3.7058006303385485,
+            "perplexity": 40.682606010023655,
+            "last_word_accuracy": 0.4765625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.46875,
+            "accuracy_norm": 0.5
+          }
+        }
+      }
+    },
+    {
+      "id": "mask_r0.5_energy",
+      "seconds": 67.8514294847846,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.527549611932129,
+            "perplexity": 92.53154486335141,
+            "last_word_accuracy": 0.203125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.40625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.646411171631337,
+            "perplexity": 38.3368345507716
+          },
+          "lambada": {
+            "nll": 4.518444922250523,
+            "perplexity": 91.69289746708314,
+            "last_word_accuracy": 0.2265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.34375,
+            "accuracy_norm": 0.390625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.5275240224401543,
+            "perplexity": 34.03958194830586
+          },
+          "lambada": {
+            "nll": 4.413780893355941,
+            "perplexity": 82.5811043413007,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.296875,
+            "accuracy_norm": 0.375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.532277180024089,
+            "perplexity": 34.201762575096716
+          },
+          "lambada": {
+            "nll": 4.425835161088363,
+            "perplexity": 83.58258300196552,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3125,
+            "accuracy_norm": 0.359375
+          }
+        }
+      }
+    },
+    {
+      "id": "mask_r0.5_variance",
+      "seconds": 68.64307678677142,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.7002722484491577,
+            "perplexity": 40.45831757504936
+          },
+          "lambada": {
+            "nll": 4.537428165063382,
+            "perplexity": 93.45015243219547,
+            "last_word_accuracy": 0.2265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.359375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.6362616320645507,
+            "perplexity": 37.949701267235284
+          },
+          "lambada": {
+            "nll": 4.504637680381015,
+            "perplexity": 90.43557153034489,
+            "last_word_accuracy": 0.21875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3125,
+            "accuracy_norm": 0.375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.5271533212083193,
+            "perplexity": 34.026965771907015
+          },
+          "lambada": {
+            "nll": 4.41688228015235,
+            "perplexity": 82.83761785614334,
+            "last_word_accuracy": 0.2265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.34375,
+            "accuracy_norm": 0.390625
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.531589788000178,
+            "perplexity": 34.17826063474747
+          },
+          "lambada": {
+            "nll": 4.422048538589597,
+            "perplexity": 83.26668578188357,
+            "last_word_accuracy": 0.2578125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.359375,
+            "accuracy_norm": 0.390625
+          }
+        }
+      }
+    },
+    {
+      "id": "mask_r0.75_energy",
+      "seconds": 65.18217904679477,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 5.892918551271443,
+            "perplexity": 362.46160493755497
+          },
+          "lambada": {
+            "nll": 7.758792977384459,
+            "perplexity": 2342.0759598489626,
+            "last_word_accuracy": 0.0234375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.203125,
+            "accuracy_norm": 0.28125
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 5.903493168302711,
+            "perplexity": 366.3148349075163
+          },
+          "lambada": {
+            "nll": 7.45014395598551,
+            "perplexity": 1720.1107477914547,
+            "last_word_accuracy": 0.046875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.1875,
+            "accuracy_norm": 0.296875
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 4.789877333519743,
+            "perplexity": 120.28661262280573
+          },
+          "lambada": {
+            "nll": 6.242903990913687,
+            "perplexity": 514.3500120032052,
+            "last_word_accuracy": 0.0390625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.328125,
+            "accuracy_norm": 0.359375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 4.736130100407013,
+            "perplexity": 113.9922085956934
+          },
+          "lambada": {
+            "nll": 6.264925059531789,
+            "perplexity": 525.8021806212149,
+            "last_word_accuracy": 0.0546875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.265625,
+            "accuracy_norm": 0.28125
+          }
+        }
+      }
+    },
+    {
+      "id": "mask_r0.75_variance",
+      "seconds": 65.5497427675873,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 6.695240326823554,
+            "perplexity": 808.5482266897621
+          },
+          "lambada": {
+            "nll": 7.816077412478255,
+            "perplexity": 2480.1576668433327,
+            "last_word_accuracy": 0.03125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.25,
+            "accuracy_norm": 0.390625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 6.051086858760588,
+            "perplexity": 424.5742315920188
+          },
+          "lambada": {
+            "nll": 7.286181231254537,
+            "perplexity": 1459.9846942463753,
+            "last_word_accuracy": 0.03125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.203125,
+            "accuracy_norm": 0.28125
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 5.014500403357578,
+            "perplexity": 150.5808882643429
+          },
+          "lambada": {
+            "nll": 6.105856195832816,
+            "perplexity": 448.4764607965241,
+            "last_word_accuracy": 0.09375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.296875,
+            "accuracy_norm": 0.34375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 4.898952196722162,
+            "perplexity": 134.14914410567877
+          },
+          "lambada": {
+            "nll": 6.191796930561981,
+            "perplexity": 488.72351988186347,
+            "last_word_accuracy": 0.0546875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.265625,
+            "accuracy_norm": 0.21875
+          }
+        }
+      }
+    },
+    {
+      "id": "context_r0.25_s256",
+      "seconds": 76.42007477395236,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.728765797147564,
+            "perplexity": 15.313974800169602
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.2061590007707186,
+            "perplexity": 24.684092326031557
+          },
+          "lambada": {
+            "nll": 3.7113645113922753,
+            "perplexity": 40.90959006139301,
+            "last_word_accuracy": 0.4609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.515625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.1881405456393375,
+            "perplexity": 24.243306184233457
+          },
+          "lambada": {
+            "nll": 3.698191840042189,
+            "perplexity": 40.37423524415484,
+            "last_word_accuracy": 0.453125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.46875,
+            "accuracy_norm": 0.484375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.165798359291226,
+            "perplexity": 23.707663713073522
+          },
+          "lambada": {
+            "nll": 3.695943417478783,
+            "perplexity": 40.28355888024337,
+            "last_word_accuracy": 0.484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.53125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.16601209266513,
+            "perplexity": 23.712731373571092
+          },
+          "lambada": {
+            "nll": 3.697067252759144,
+            "perplexity": 40.32885641364698,
+            "last_word_accuracy": 0.484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.46875,
+            "accuracy_norm": 0.53125
+          }
+        }
+      }
+    },
+    {
+      "id": "context_r0.25_s1024",
+      "seconds": 70.2436446622014,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.3271072067007177,
+            "perplexity": 10.248252535416693
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.7812076467922355,
+            "perplexity": 16.138498790779344
+          },
+          "lambada": {
+            "nll": 3.7113645113922753,
+            "perplexity": 40.90959006139301,
+            "last_word_accuracy": 0.4609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.515625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.766646965974004,
+            "perplexity": 15.905213776929582
+          },
+          "lambada": {
+            "nll": 3.698191840042189,
+            "perplexity": 40.37423524415484,
+            "last_word_accuracy": 0.453125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.46875,
+            "accuracy_norm": 0.484375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.7640848243691005,
+            "perplexity": 15.864514527860907
+          },
+          "lambada": {
+            "nll": 3.695943417478783,
+            "perplexity": 40.28355888024337,
+            "last_word_accuracy": 0.484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.53125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.7651962623335167,
+            "perplexity": 15.88215675389799
+          },
+          "lambada": {
+            "nll": 3.697067252759144,
+            "perplexity": 40.32885641364698,
+            "last_word_accuracy": 0.484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.46875,
+            "accuracy_norm": 0.53125
+          }
+        }
+      }
+    },
+    {
+      "id": "context_r0.25_s2048",
+      "seconds": 70.28574664518237,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.207161579588651,
+            "perplexity": 9.089878843826728
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.6554159621931483,
+            "perplexity": 14.230904346535791
+          },
+          "lambada": {
+            "nll": 3.7113645113922753,
+            "perplexity": 40.90959006139301,
+            "last_word_accuracy": 0.4609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.515625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.6428992528128052,
+            "perplexity": 14.053890379829017
+          },
+          "lambada": {
+            "nll": 3.698191840042189,
+            "perplexity": 40.37423524415484,
+            "last_word_accuracy": 0.453125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.46875,
+            "accuracy_norm": 0.484375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.64154137712487,
+            "perplexity": 14.03481989436585
+          },
+          "lambada": {
+            "nll": 3.695943417478783,
+            "perplexity": 40.28355888024337,
+            "last_word_accuracy": 0.484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.484375,
+            "accuracy_norm": 0.53125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.6429384172865396,
+            "perplexity": 14.054440803828125
+          },
+          "lambada": {
+            "nll": 3.697067252759144,
+            "perplexity": 40.32885641364698,
+            "last_word_accuracy": 0.484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.46875,
+            "accuracy_norm": 0.53125
+          }
+        }
+      }
+    },
+    {
+      "id": "context_r0.5_s256",
+      "seconds": 71.79371800646186,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.728765797147564,
+            "perplexity": 15.313974800169602
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.9207701402551987,
+            "perplexity": 50.43927513996216
+          },
+          "lambada": {
+            "nll": 4.527549611932129,
+            "perplexity": 92.53154486335141,
+            "last_word_accuracy": 0.203125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.40625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.9607121504989324,
+            "perplexity": 52.494696765189616
+          },
+          "lambada": {
+            "nll": 4.518444922250523,
+            "perplexity": 91.69289746708314,
+            "last_word_accuracy": 0.2265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.34375,
+            "accuracy_norm": 0.390625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.7728436133440804,
+            "perplexity": 43.50359652202035
+          },
+          "lambada": {
+            "nll": 4.413780893355941,
+            "perplexity": 82.5811043413007,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.296875,
+            "accuracy_norm": 0.375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.7769570799434886,
+            "perplexity": 43.682915672086025
+          },
+          "lambada": {
+            "nll": 4.425835161088363,
+            "perplexity": 83.58258300196552,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3125,
+            "accuracy_norm": 0.359375
+          }
+        }
+      }
+    },
+    {
+      "id": "context_r0.5_s1024",
+      "seconds": 66.43053437769413,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.3271072067007177,
+            "perplexity": 10.248252535416693
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.4073108139858452,
+            "perplexity": 30.183964724699276
+          },
+          "lambada": {
+            "nll": 4.527549611932129,
+            "perplexity": 92.53154486335141,
+            "last_word_accuracy": 0.203125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.40625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.3944130577766067,
+            "perplexity": 29.79715913052473
+          },
+          "lambada": {
+            "nll": 4.518444922250523,
+            "perplexity": 91.69289746708314,
+            "last_word_accuracy": 0.2265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.34375,
+            "accuracy_norm": 0.390625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.319518707364885,
+            "perplexity": 27.647041038652098
+          },
+          "lambada": {
+            "nll": 4.413780893355941,
+            "perplexity": 82.5811043413007,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.296875,
+            "accuracy_norm": 0.375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.3249214522882875,
+            "perplexity": 27.796815180692477
+          },
+          "lambada": {
+            "nll": 4.425835161088363,
+            "perplexity": 83.58258300196552,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3125,
+            "accuracy_norm": 0.359375
+          }
+        }
+      }
+    },
+    {
+      "id": "context_r0.5_s2048",
+      "seconds": 66.75900060124695,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.207161579588651,
+            "perplexity": 9.089878843826728
+          },
+          "lambada": {
+            "nll": 3.282854189368313,
+            "perplexity": 26.651733339226148,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.703125,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.2505079305748503,
+            "perplexity": 25.80344294680576
+          },
+          "lambada": {
+            "nll": 4.527549611932129,
+            "perplexity": 92.53154486335141,
+            "last_word_accuracy": 0.203125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.40625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.211369546611657,
+            "perplexity": 24.813045587323614
+          },
+          "lambada": {
+            "nll": 4.518444922250523,
+            "perplexity": 91.69289746708314,
+            "last_word_accuracy": 0.2265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.34375,
+            "accuracy_norm": 0.390625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.180686678604551,
+            "perplexity": 24.063271613888368
+          },
+          "lambada": {
+            "nll": 4.413780893355941,
+            "perplexity": 82.5811043413007,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.296875,
+            "accuracy_norm": 0.375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.1846235058164387,
+            "perplexity": 24.15819127494374
+          },
+          "lambada": {
+            "nll": 4.425835161088363,
+            "perplexity": 83.58258300196552,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3125,
+            "accuracy_norm": 0.359375
+          }
+        }
+      }
+    },
+    {
+      "id": "model_q05_r0.25_t1024",
+      "seconds": 52.75812156498432,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.842176196626488,
+            "perplexity": 17.15305336647603
+          },
+          "lambada": {
+            "nll": 3.5434967261347623,
+            "perplexity": 34.587651528920595,
+            "last_word_accuracy": 0.5078125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.59375,
+            "accuracy_norm": 0.609375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.2932613245895,
+            "perplexity": 26.930549856051574
+          },
+          "lambada": {
+            "nll": 4.01123667636451,
+            "perplexity": 55.215111582196705,
+            "last_word_accuracy": 0.3984375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.328125,
+            "accuracy_norm": 0.375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.2625177312503824,
+            "perplexity": 26.115205509200383
+          },
+          "lambada": {
+            "nll": 3.9978351535140515,
+            "perplexity": 54.48008126639446,
+            "last_word_accuracy": 0.3984375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.359375,
+            "accuracy_norm": 0.390625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.243684324499679,
+            "perplexity": 25.627969777504404
+          },
+          "lambada": {
+            "nll": 3.988729956110888,
+            "perplexity": 53.98628085854238,
+            "last_word_accuracy": 0.40625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.34375,
+            "accuracy_norm": 0.375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.243193758910416,
+            "perplexity": 25.615400660649062
+          },
+          "lambada": {
+            "nll": 3.9887594694221593,
+            "perplexity": 53.98787419596596,
+            "last_word_accuracy": 0.4140625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.34375,
+            "accuracy_norm": 0.359375
+          }
+        }
+      }
+    },
+    {
+      "id": "model_q05_r0.25_t4096",
+      "seconds": 53.460003796964884,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.842176196626488,
+            "perplexity": 17.15305336647603
+          },
+          "lambada": {
+            "nll": 3.5434967261347623,
+            "perplexity": 34.587651528920595,
+            "last_word_accuracy": 0.5078125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.59375,
+            "accuracy_norm": 0.609375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.2932613245895,
+            "perplexity": 26.930549856051574
+          },
+          "lambada": {
+            "nll": 4.01123667636451,
+            "perplexity": 55.215111582196705,
+            "last_word_accuracy": 0.3984375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.328125,
+            "accuracy_norm": 0.375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.258980062376496,
+            "perplexity": 26.022981784218413
+          },
+          "lambada": {
+            "nll": 3.989590604821421,
+            "perplexity": 54.0327640815435,
+            "last_word_accuracy": 0.40625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.40625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.2402304483253195,
+            "perplexity": 25.539606628821872
+          },
+          "lambada": {
+            "nll": 3.9922962082945377,
+            "perplexity": 54.17915326194113,
+            "last_word_accuracy": 0.390625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.390625
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.2395335531514684,
+            "perplexity": 25.521814400599265
+          },
+          "lambada": {
+            "nll": 3.9897266263004822,
+            "perplexity": 54.040114197907144,
+            "last_word_accuracy": 0.3671875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.390625
+          }
+        }
+      }
+    },
+    {
+      "id": "model_q05_r0.5_t1024",
+      "seconds": 45.99455473199487,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.842176196626488,
+            "perplexity": 17.15305336647603
+          },
+          "lambada": {
+            "nll": 3.5434967261347623,
+            "perplexity": 34.587651528920595,
+            "last_word_accuracy": 0.5078125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.59375,
+            "accuracy_norm": 0.609375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 4.027095201197436,
+            "perplexity": 56.097721750580526
+          },
+          "lambada": {
+            "nll": 4.895096597953909,
+            "perplexity": 133.63291465722227,
+            "last_word_accuracy": 0.171875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.296875,
+            "accuracy_norm": 0.3125
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.929723900124985,
+            "perplexity": 50.8929241991995
+          },
+          "lambada": {
+            "nll": 4.875127722307193,
+            "perplexity": 130.99088260018468,
+            "last_word_accuracy": 0.1640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.265625,
+            "accuracy_norm": 0.3125
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.8485206223280697,
+            "perplexity": 46.923594141279175
+          },
+          "lambada": {
+            "nll": 4.783373190965739,
+            "perplexity": 119.5067901344083,
+            "last_word_accuracy": 0.2109375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.234375,
+            "accuracy_norm": 0.296875
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.85444156251075,
+            "perplexity": 47.202250073818135
+          },
+          "lambada": {
+            "nll": 4.801003900272297,
+            "perplexity": 121.63246311052035,
+            "last_word_accuracy": 0.1953125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.234375,
+            "accuracy_norm": 0.296875
+          }
+        }
+      }
+    },
+    {
+      "id": "model_q05_r0.5_t4096",
+      "seconds": 51.404251947999,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.842176196626488,
+            "perplexity": 17.15305336647603
+          },
+          "lambada": {
+            "nll": 3.5434967261347623,
+            "perplexity": 34.587651528920595,
+            "last_word_accuracy": 0.5078125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.59375,
+            "accuracy_norm": 0.609375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 4.027095201197436,
+            "perplexity": 56.097721750580526
+          },
+          "lambada": {
+            "nll": 4.895096597953909,
+            "perplexity": 133.63291465722227,
+            "last_word_accuracy": 0.171875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.296875,
+            "accuracy_norm": 0.3125
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.9153523753067287,
+            "perplexity": 50.16674591932232
+          },
+          "lambada": {
+            "nll": 4.862235148805972,
+            "perplexity": 129.31291293429274,
+            "last_word_accuracy": 0.1796875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3125,
+            "accuracy_norm": 0.34375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.8065154491805284,
+            "perplexity": 44.993383659906584
+          },
+          "lambada": {
+            "nll": 4.7371248055841555,
+            "perplexity": 114.10565364857428,
+            "last_word_accuracy": 0.21875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.234375,
+            "accuracy_norm": 0.3125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.8075705638370403,
+            "perplexity": 45.04088189208616
+          },
+          "lambada": {
+            "nll": 4.741534150169399,
+            "perplexity": 114.6098956660708,
+            "last_word_accuracy": 0.21875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.25,
+            "accuracy_norm": 0.328125
+          }
+        }
+      }
+    },
+    {
+      "id": "model_q7i_r0.25_t1024",
+      "seconds": 154.76666541956365,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.2928328094183814,
+            "perplexity": 9.902951157328323
+          },
+          "lambada": {
+            "nll": 3.22527658339386,
+            "perplexity": 25.16053217891855,
+            "last_word_accuracy": 0.703125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.78125,
+            "accuracy_norm": 0.828125
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.6457089929897957,
+            "perplexity": 14.093433687467334
+          },
+          "lambada": {
+            "nll": 3.4628386282454326,
+            "perplexity": 31.907421391845702,
+            "last_word_accuracy": 0.5625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.609375,
+            "accuracy_norm": 0.6875
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.6188805910472532,
+            "perplexity": 13.720356295869593
+          },
+          "lambada": {
+            "nll": 3.4444938101653237,
+            "perplexity": 31.327421810041596,
+            "last_word_accuracy": 0.5703125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.625,
+            "accuracy_norm": 0.734375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.6112098395241214,
+            "perplexity": 13.615513477601628
+          },
+          "lambada": {
+            "nll": 3.424655465260452,
+            "perplexity": 30.712061656304662,
+            "last_word_accuracy": 0.59375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.640625,
+            "accuracy_norm": 0.6875
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.610638418776182,
+            "perplexity": 13.607735513163444
+          },
+          "lambada": {
+            "nll": 3.4233594309451676,
+            "perplexity": 30.67228355296638,
+            "last_word_accuracy": 0.6015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.65625,
+            "accuracy_norm": 0.703125
+          }
+        }
+      }
+    },
+    {
+      "id": "model_q7i_r0.25_t4096",
+      "seconds": 155.58399116806686,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.2928328094183814,
+            "perplexity": 9.902951157328323
+          },
+          "lambada": {
+            "nll": 3.22527658339386,
+            "perplexity": 25.16053217891855,
+            "last_word_accuracy": 0.703125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.78125,
+            "accuracy_norm": 0.828125
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.6457089929897957,
+            "perplexity": 14.093433687467334
+          },
+          "lambada": {
+            "nll": 3.4628386282454326,
+            "perplexity": 31.907421391845702,
+            "last_word_accuracy": 0.5625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.609375,
+            "accuracy_norm": 0.6875
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.6177946956656917,
+            "perplexity": 13.70546551071517
+          },
+          "lambada": {
+            "nll": 3.4409232599111337,
+            "perplexity": 31.215765132647856,
+            "last_word_accuracy": 0.5625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.640625,
+            "accuracy_norm": 0.703125
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.604975105031829,
+            "perplexity": 13.53088844751744
+          },
+          "lambada": {
+            "nll": 3.4173119578811058,
+            "perplexity": 30.487353487764352,
+            "last_word_accuracy": 0.59375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.65625,
+            "accuracy_norm": 0.703125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.604852883549819,
+            "perplexity": 13.52923478333717
+          },
+          "lambada": {
+            "nll": 3.416627590733866,
+            "perplexity": 30.466496082506566,
+            "last_word_accuracy": 0.59375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.65625,
+            "accuracy_norm": 0.703125
+          }
+        }
+      }
+    },
+    {
+      "id": "model_q7i_r0.5_t1024",
+      "seconds": 134.77277621813118,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.2928328094183814,
+            "perplexity": 9.902951157328323
+          },
+          "lambada": {
+            "nll": 3.22527658339386,
+            "perplexity": 25.16053217891855,
+            "last_word_accuracy": 0.703125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.78125,
+            "accuracy_norm": 0.828125
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.2462911101936593,
+            "perplexity": 25.69486355347482
+          },
+          "lambada": {
+            "nll": 4.193924242374699,
+            "perplexity": 66.28238942489571,
+            "last_word_accuracy": 0.359375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.28125,
+            "accuracy_norm": 0.375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.165146086780526,
+            "perplexity": 23.69220489796872
+          },
+          "lambada": {
+            "nll": 4.149124680371717,
+            "perplexity": 63.37849956654537,
+            "last_word_accuracy": 0.375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.296875,
+            "accuracy_norm": 0.390625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.125778399801534,
+            "perplexity": 22.777618288321236
+          },
+          "lambada": {
+            "nll": 4.0218766122554355,
+            "perplexity": 55.80573334656909,
+            "last_word_accuracy": 0.3984375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.234375,
+            "accuracy_norm": 0.359375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.1223005679255595,
+            "perplexity": 22.698539153055247
+          },
+          "lambada": {
+            "nll": 4.024681457730283,
+            "perplexity": 55.962479526861785,
+            "last_word_accuracy": 0.3984375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.28125,
+            "accuracy_norm": 0.40625
+          }
+        }
+      }
+    },
+    {
+      "id": "model_q7i_r0.5_t4096",
+      "seconds": 135.88245424814522,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.2928328094183814,
+            "perplexity": 9.902951157328323
+          },
+          "lambada": {
+            "nll": 3.22527658339386,
+            "perplexity": 25.16053217891855,
+            "last_word_accuracy": 0.703125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.78125,
+            "accuracy_norm": 0.828125
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.2462911101936593,
+            "perplexity": 25.69486355347482
+          },
+          "lambada": {
+            "nll": 4.193924242374699,
+            "perplexity": 66.28238942489571,
+            "last_word_accuracy": 0.359375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.28125,
+            "accuracy_norm": 0.375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.1582698747369875,
+            "perplexity": 23.52985110257738
+          },
+          "lambada": {
+            "nll": 4.133024842566721,
+            "perplexity": 62.36628610360798,
+            "last_word_accuracy": 0.390625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.328125,
+            "accuracy_norm": 0.40625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.1173892609060627,
+            "perplexity": 22.58733296577764
+          },
+          "lambada": {
+            "nll": 4.016339611705282,
+            "perplexity": 55.49759085017541,
+            "last_word_accuracy": 0.375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.265625,
+            "accuracy_norm": 0.34375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.1168211621547632,
+            "perplexity": 22.574504774309386
+          },
+          "lambada": {
+            "nll": 4.019487106963482,
+            "perplexity": 55.67254444258437,
+            "last_word_accuracy": 0.3828125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.28125,
+            "accuracy_norm": 0.359375
+          }
+        }
+      }
+    },
+    {
+      "id": "gain_0",
+      "seconds": 53.392913058400154,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.6140713617059816,
+            "perplexity": 13.654530368661291
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 3.7845460533395907,
+            "perplexity": 44.01568524963625
+          }
+        }
+      }
+    },
+    {
+      "id": "gain_0.25",
+      "seconds": 23.803741693496704,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.6140713617059816,
+            "perplexity": 13.654530368661291
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 3.6770287194597278,
+            "perplexity": 39.5287683494222
+          }
+        }
+      }
+    },
+    {
+      "id": "gain_0.5",
+      "seconds": 23.87373502738774,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.6140713617059816,
+            "perplexity": 13.654530368661291
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 3.61621968853497,
+            "perplexity": 37.19668664148549
+          }
+        }
+      }
+    },
+    {
+      "id": "gain_0.75",
+      "seconds": 23.86020173318684,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.6140713617059816,
+            "perplexity": 13.654530368661291
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 3.5865722383771623,
+            "perplexity": 36.11008677560458
+          }
+        }
+      }
+    },
+    {
+      "id": "gain_1",
+      "seconds": 23.20805828459561,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.6140713617059816,
+            "perplexity": 13.654530368661291
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 3.574370908643868,
+            "perplexity": 35.67217269993845
+          }
+        }
+      }
+    },
+    {
+      "id": "gain_1.25",
+      "seconds": 23.5326468963176,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.6140713617059816,
+            "perplexity": 13.654530368661291
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 3.5886495015392565,
+            "perplexity": 36.18517489053052
+          }
+        }
+      }
+    },
+    {
+      "id": "gain_1.5",
+      "seconds": 23.825992399826646,
+      "scores": {
+        "original": {
+          "wiki_validation": {
+            "nll": 2.6140713617059816,
+            "perplexity": 13.654530368661291
+          }
+        },
+        "affine": {
+          "wiki_validation": {
+            "nll": 3.6260189944750643,
+            "perplexity": 37.56298013369122
+          }
+        }
+      }
+    },
+    {
+      "id": "gain_confirmation",
+      "seconds": 348.92855433002114,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.244108861291409,
+            "perplexity": 25.63885210338271,
+            "last_word_accuracy": 0.62890625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.751953125,
+            "accuracy_norm": 0.724609375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.4771828059014505,
+            "perplexity": 87.98644828881213,
+            "last_word_accuracy": 0.2431640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.384765625,
+            "accuracy_norm": 0.388671875
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.646411171631337,
+            "perplexity": 38.3368345507716
+          },
+          "lambada": {
+            "nll": 4.465505568678258,
+            "perplexity": 86.9649852001359,
+            "last_word_accuracy": 0.2607421875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.416015625,
+            "accuracy_norm": 0.41015625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.4713313518904894,
+            "perplexity": 32.17955625135838
+          },
+          "lambada": {
+            "nll": 4.293612275538658,
+            "perplexity": 73.23052011540878,
+            "last_word_accuracy": 0.2900390625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3984375,
+            "accuracy_norm": 0.388671875
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.478872388776268,
+            "perplexity": 32.423140757560496
+          },
+          "lambada": {
+            "nll": 4.30938069361004,
+            "perplexity": 74.39440174239404,
+            "last_word_accuracy": 0.283203125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.4140625,
+            "accuracy_norm": 0.404296875
+          }
+        }
+      }
+    },
+    {
+      "id": "extended_q15_r0.25",
+      "seconds": 390.09251636452973,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.2571393031758444,
+            "perplexity": 25.975123802094654,
+            "last_word_accuracy": 0.634765625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.755859375,
+            "accuracy_norm": 0.728515625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.965105564393643,
+            "perplexity": 19.396750739628466
+          },
+          "lambada": {
+            "nll": 3.683356875635395,
+            "perplexity": 39.77970571698518,
+            "last_word_accuracy": 0.462890625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.4921875,
+            "accuracy_norm": 0.46875
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.9485933636032673,
+            "perplexity": 19.07909749123165
+          },
+          "lambada": {
+            "nll": 3.67102423296848,
+            "perplexity": 39.29212955206151,
+            "last_word_accuracy": 0.466796875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.498046875,
+            "accuracy_norm": 0.482421875
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.93553442684405,
+            "perplexity": 18.8315645400084
+          },
+          "lambada": {
+            "nll": 3.6755129159358666,
+            "perplexity": 39.46889589196913,
+            "last_word_accuracy": 0.4892578125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.48828125,
+            "accuracy_norm": 0.466796875
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.936379315101937,
+            "perplexity": 18.847481830985156
+          },
+          "lambada": {
+            "nll": 3.676295977432591,
+            "perplexity": 39.49981456869308,
+            "last_word_accuracy": 0.4892578125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.486328125,
+            "accuracy_norm": 0.46484375
+          }
+        }
+      }
+    },
+    {
+      "id": "extended_q15_r0.5",
+      "seconds": 367.4587156455964,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.2571393031758444,
+            "perplexity": 25.975123802094654,
+            "last_word_accuracy": 0.634765625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.755859375,
+            "accuracy_norm": 0.728515625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.499179518196411,
+            "perplexity": 89.94330417332733,
+            "last_word_accuracy": 0.25390625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.359375,
+            "accuracy_norm": 0.375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.646411171631337,
+            "perplexity": 38.3368345507716
+          },
+          "lambada": {
+            "nll": 4.4901701575007555,
+            "perplexity": 89.13661185141851,
+            "last_word_accuracy": 0.2705078125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.37109375,
+            "accuracy_norm": 0.376953125
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.5275240224401543,
+            "perplexity": 34.03958194830586
+          },
+          "lambada": {
+            "nll": 4.3695906600962084,
+            "perplexity": 79.01128260830787,
+            "last_word_accuracy": 0.263671875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.373046875,
+            "accuracy_norm": 0.376953125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.532277180024089,
+            "perplexity": 34.201762575096716
+          },
+          "lambada": {
+            "nll": 4.376774197660791,
+            "perplexity": 79.5809066332071,
+            "last_word_accuracy": 0.26171875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3671875,
+            "accuracy_norm": 0.373046875
+          }
+        }
+      }
+    },
+    {
+      "id": "extended_q05_r0.25",
+      "seconds": 265.0693244803697,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.842176196626488,
+            "perplexity": 17.15305336647603
+          },
+          "lambada": {
+            "nll": 3.4920650454848263,
+            "perplexity": 32.85372213406164,
+            "last_word_accuracy": 0.5166015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.64453125,
+            "accuracy_norm": 0.58203125
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.2932613245895,
+            "perplexity": 26.930549856051574
+          },
+          "lambada": {
+            "nll": 3.9864610002921927,
+            "perplexity": 53.86392723243596,
+            "last_word_accuracy": 0.3564453125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.462890625,
+            "accuracy_norm": 0.4375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.258980062376496,
+            "perplexity": 26.022981784218413
+          },
+          "lambada": {
+            "nll": 3.9618784960256948,
+            "perplexity": 52.555959439718684,
+            "last_word_accuracy": 0.361328125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.47265625,
+            "accuracy_norm": 0.431640625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.2402304483253195,
+            "perplexity": 25.539606628821872
+          },
+          "lambada": {
+            "nll": 3.961761570212834,
+            "perplexity": 52.54981465068974,
+            "last_word_accuracy": 0.34765625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.455078125,
+            "accuracy_norm": 0.41015625
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.2395335531514684,
+            "perplexity": 25.521814400599265
+          },
+          "lambada": {
+            "nll": 3.9576082830614174,
+            "perplexity": 52.33201279061157,
+            "last_word_accuracy": 0.3447265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.455078125,
+            "accuracy_norm": 0.412109375
+          }
+        }
+      }
+    },
+    {
+      "id": "extended_q05_r0.5",
+      "seconds": 295.0565979089588,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.842176196626488,
+            "perplexity": 17.15305336647603
+          },
+          "lambada": {
+            "nll": 3.4920650454848263,
+            "perplexity": 32.85372213406164,
+            "last_word_accuracy": 0.5166015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.64453125,
+            "accuracy_norm": 0.58203125
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 4.027095201197436,
+            "perplexity": 56.097721750580526
+          },
+          "lambada": {
+            "nll": 4.876131072596552,
+            "perplexity": 131.12237829723628,
+            "last_word_accuracy": 0.181640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.330078125,
+            "accuracy_norm": 0.314453125
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.9153523753067287,
+            "perplexity": 50.16674591932232
+          },
+          "lambada": {
+            "nll": 4.832501440531453,
+            "perplexity": 125.52456048887551,
+            "last_word_accuracy": 0.1796875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.341796875,
+            "accuracy_norm": 0.333984375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.8065154491805284,
+            "perplexity": 44.993383659906584
+          },
+          "lambada": {
+            "nll": 4.700131470060479,
+            "perplexity": 109.96162816376112,
+            "last_word_accuracy": 0.16796875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.337890625,
+            "accuracy_norm": 0.326171875
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.8075705638370403,
+            "perplexity": 45.04088189208616
+          },
+          "lambada": {
+            "nll": 4.7032886846496895,
+            "perplexity": 110.30934924665063,
+            "last_word_accuracy": 0.1767578125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.337890625,
+            "accuracy_norm": 0.322265625
+          }
+        }
+      }
+    },
+    {
+      "id": "extended_q7i_r0.25",
+      "seconds": 997.1134437080473,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.2928328094183814,
+            "perplexity": 9.902951157328323
+          },
+          "lambada": {
+            "nll": 3.192762553513291,
+            "perplexity": 24.35561829008329,
+            "last_word_accuracy": 0.7001953125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.8203125,
+            "accuracy_norm": 0.80078125
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.6457089929897957,
+            "perplexity": 14.093433687467334
+          },
+          "lambada": {
+            "nll": 3.437971098863692,
+            "perplexity": 31.123747059672585,
+            "last_word_accuracy": 0.5947265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.654296875,
+            "accuracy_norm": 0.64453125
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.6177946956656917,
+            "perplexity": 13.70546551071517
+          },
+          "lambada": {
+            "nll": 3.4161091887859283,
+            "perplexity": 30.450706284675153,
+            "last_word_accuracy": 0.60546875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.681640625,
+            "accuracy_norm": 0.640625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.604975105031829,
+            "perplexity": 13.53088844751744
+          },
+          "lambada": {
+            "nll": 3.396905830823554,
+            "perplexity": 29.871529341198368,
+            "last_word_accuracy": 0.6083984375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6484375,
+            "accuracy_norm": 0.63671875
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.604852883549819,
+            "perplexity": 13.52923478333717
+          },
+          "lambada": {
+            "nll": 3.3966567039117073,
+            "perplexity": 29.864088466241046,
+            "last_word_accuracy": 0.6123046875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.662109375,
+            "accuracy_norm": 0.638671875
+          }
+        }
+      }
+    },
+    {
+      "id": "extended_q7i_r0.5",
+      "seconds": 856.7900834009051,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.2928328094183814,
+            "perplexity": 9.902951157328323
+          },
+          "lambada": {
+            "nll": 3.192762553513291,
+            "perplexity": 24.35561829008329,
+            "last_word_accuracy": 0.7001953125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.8203125,
+            "accuracy_norm": 0.80078125
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.2462911101936593,
+            "perplexity": 25.69486355347482
+          },
+          "lambada": {
+            "nll": 4.1382265896664885,
+            "perplexity": 62.691544975257926,
+            "last_word_accuracy": 0.3935546875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.408203125,
+            "accuracy_norm": 0.427734375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.1582698747369875,
+            "perplexity": 23.52985110257738
+          },
+          "lambada": {
+            "nll": 4.085256422350179,
+            "perplexity": 59.45718194701397,
+            "last_word_accuracy": 0.4208984375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.416015625,
+            "accuracy_norm": 0.419921875
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.1173892609060627,
+            "perplexity": 22.58733296577764
+          },
+          "lambada": {
+            "nll": 3.9733442156703362,
+            "perplexity": 53.162019152177805,
+            "last_word_accuracy": 0.4267578125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.412109375,
+            "accuracy_norm": 0.4140625
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.1168211621547632,
+            "perplexity": 22.574504774309386
+          },
+          "lambada": {
+            "nll": 3.9763794034754407,
+            "perplexity": 53.32362098630009,
+            "last_word_accuracy": 0.4248046875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.41015625,
+            "accuracy_norm": 0.423828125
+          }
+        }
+      }
+    },
+    {
+      "id": "fit_c12288_r0.25",
+      "seconds": 149.90239151753485,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.225663340975124,
+            "perplexity": 25.17026508750416,
+            "last_word_accuracy": 0.640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.7265625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.965105564393643,
+            "perplexity": 19.396750739628466
+          },
+          "lambada": {
+            "nll": 3.6373629634680715,
+            "perplexity": 37.99151948862847,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6015625,
+            "accuracy_norm": 0.609375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.934410729753528,
+            "perplexity": 18.810415450535373
+          },
+          "lambada": {
+            "nll": 3.626928897905077,
+            "perplexity": 37.597174372524776,
+            "last_word_accuracy": 0.44921875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6015625,
+            "accuracy_norm": 0.59375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.9357805867950977,
+            "perplexity": 18.836200687607242
+          },
+          "lambada": {
+            "nll": 3.659690809326109,
+            "perplexity": 38.84932916390063,
+            "last_word_accuracy": 0.46484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.625,
+            "accuracy_norm": 0.6015625
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.9354050332086192,
+            "perplexity": 18.82912801305066
+          },
+          "lambada": {
+            "nll": 3.6609897500408435,
+            "perplexity": 38.899824927693594,
+            "last_word_accuracy": 0.4765625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.625,
+            "accuracy_norm": 0.6015625
+          }
+        }
+      }
+    },
+    {
+      "id": "fit_c12288_r0.5",
+      "seconds": 111.20158839970827,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.225663340975124,
+            "perplexity": 25.17026508750416,
+            "last_word_accuracy": 0.640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.7265625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.477888643867635,
+            "perplexity": 88.04857438742434,
+            "last_word_accuracy": 0.2578125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.40625,
+            "accuracy_norm": 0.3984375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.598972566906953,
+            "perplexity": 36.560651516741004
+          },
+          "lambada": {
+            "nll": 4.4390314784907465,
+            "perplexity": 84.69287506742305,
+            "last_word_accuracy": 0.2578125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.3671875
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.4937272715708514,
+            "perplexity": 32.90837786051857
+          },
+          "lambada": {
+            "nll": 4.4439254303552955,
+            "perplexity": 85.1083738073975,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3984375,
+            "accuracy_norm": 0.421875
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.494850494623651,
+            "perplexity": 32.9453620760351
+          },
+          "lambada": {
+            "nll": 4.435860960069568,
+            "perplexity": 84.4247799716775,
+            "last_word_accuracy": 0.26953125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.40625,
+            "accuracy_norm": 0.3984375
+          }
+        }
+      }
+    },
+    {
+      "id": "fit_c16384_r0.25",
+      "seconds": 120.78666936606169,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.225663340975124,
+            "perplexity": 25.17026508750416,
+            "last_word_accuracy": 0.640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.7265625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.965105564393643,
+            "perplexity": 19.396750739628466
+          },
+          "lambada": {
+            "nll": 3.6373629634680715,
+            "perplexity": 37.99151948862847,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6015625,
+            "accuracy_norm": 0.609375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.969919178583851,
+            "perplexity": 19.490344295145782
+          },
+          "lambada": {
+            "nll": 3.6500149460747737,
+            "perplexity": 38.47524109856514,
+            "last_word_accuracy": 0.44921875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.578125,
+            "accuracy_norm": 0.59375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.955181588398734,
+            "perplexity": 19.205209846516077
+          },
+          "lambada": {
+            "nll": 3.629964531337881,
+            "perplexity": 37.71147901775317,
+            "last_word_accuracy": 0.44140625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6171875,
+            "accuracy_norm": 0.578125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.956658197242453,
+            "perplexity": 19.233589376797127
+          },
+          "lambada": {
+            "nll": 3.6309479768572164,
+            "perplexity": 37.748584445413385,
+            "last_word_accuracy": 0.4375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6015625,
+            "accuracy_norm": 0.578125
+          }
+        }
+      }
+    },
+    {
+      "id": "fit_c16384_r0.5",
+      "seconds": 111.3525826279074,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.225663340975124,
+            "perplexity": 25.17026508750416,
+            "last_word_accuracy": 0.640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.7265625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.477888643867635,
+            "perplexity": 88.04857438742434,
+            "last_word_accuracy": 0.2578125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.40625,
+            "accuracy_norm": 0.3984375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.7025582561754202,
+            "perplexity": 40.55091139638969
+          },
+          "lambada": {
+            "nll": 4.51635422312416,
+            "perplexity": 91.50139546274657,
+            "last_word_accuracy": 0.23046875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.359375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.5856069501365466,
+            "perplexity": 36.07524695141403
+          },
+          "lambada": {
+            "nll": 4.404837630714887,
+            "perplexity": 81.84585251166422,
+            "last_word_accuracy": 0.2734375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3359375,
+            "accuracy_norm": 0.375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.595740275373664,
+            "perplexity": 36.44266761429814
+          },
+          "lambada": {
+            "nll": 4.414184065909231,
+            "perplexity": 82.61440548859464,
+            "last_word_accuracy": 0.28125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3515625,
+            "accuracy_norm": 0.390625
+          }
+        }
+      }
+    },
+    {
+      "id": "fit_c20480_r0.25",
+      "seconds": 118.91810104995966,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.225663340975124,
+            "perplexity": 25.17026508750416,
+            "last_word_accuracy": 0.640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.7265625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.965105564393643,
+            "perplexity": 19.396750739628466
+          },
+          "lambada": {
+            "nll": 3.6373629634680715,
+            "perplexity": 37.99151948862847,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6015625,
+            "accuracy_norm": 0.609375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.9392371131016084,
+            "perplexity": 18.90142116400935
+          },
+          "lambada": {
+            "nll": 3.6336340462341985,
+            "perplexity": 37.85011606155348,
+            "last_word_accuracy": 0.4765625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6015625,
+            "accuracy_norm": 0.6015625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.925118862532823,
+            "perplexity": 18.636441092844684
+          },
+          "lambada": {
+            "nll": 3.6321901781059434,
+            "perplexity": 37.79550492045205,
+            "last_word_accuracy": 0.44921875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.5859375,
+            "accuracy_norm": 0.5546875
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.924955692776495,
+            "perplexity": 18.633400437371
+          },
+          "lambada": {
+            "nll": 3.6325724252902742,
+            "perplexity": 37.80995490734572,
+            "last_word_accuracy": 0.46484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.5859375,
+            "accuracy_norm": 0.5703125
+          }
+        }
+      }
+    },
+    {
+      "id": "fit_c20480_r0.5",
+      "seconds": 111.20748708024621,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.225663340975124,
+            "perplexity": 25.17026508750416,
+            "last_word_accuracy": 0.640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.7265625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.477888643867635,
+            "perplexity": 88.04857438742434,
+            "last_word_accuracy": 0.2578125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.40625,
+            "accuracy_norm": 0.3984375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.609900995243319,
+            "perplexity": 36.96239318092169
+          },
+          "lambada": {
+            "nll": 4.44689028208132,
+            "perplexity": 85.36108195235339,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.359375,
+            "accuracy_norm": 0.3671875
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.4927230282539026,
+            "perplexity": 32.87534643055294
+          },
+          "lambada": {
+            "nll": 4.3721187029509,
+            "perplexity": 79.21127921022115,
+            "last_word_accuracy": 0.25390625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3828125,
+            "accuracy_norm": 0.390625
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.4962632128870417,
+            "perplexity": 32.991937481951055
+          },
+          "lambada": {
+            "nll": 4.383117794603237,
+            "perplexity": 80.08734043687504,
+            "last_word_accuracy": 0.25
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.375
+          }
+        }
+      }
+    },
+    {
+      "id": "fit_c24576_r0.25",
+      "seconds": 119.71957066655159,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.225663340975124,
+            "perplexity": 25.17026508750416,
+            "last_word_accuracy": 0.640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.7265625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.965105564393643,
+            "perplexity": 19.396750739628466
+          },
+          "lambada": {
+            "nll": 3.6373629634680715,
+            "perplexity": 37.99151948862847,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6015625,
+            "accuracy_norm": 0.609375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.9437804474056115,
+            "perplexity": 18.98749201544882
+          },
+          "lambada": {
+            "nll": 3.6578297823825827,
+            "perplexity": 38.77709674967083,
+            "last_word_accuracy": 0.44921875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6015625,
+            "accuracy_norm": 0.6015625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.9264842666058626,
+            "perplexity": 18.661904745551332
+          },
+          "lambada": {
+            "nll": 3.627681211839729,
+            "perplexity": 37.62546989293136,
+            "last_word_accuracy": 0.4921875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.609375,
+            "accuracy_norm": 0.5859375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.925997870309012,
+            "perplexity": 18.65282987136243
+          },
+          "lambada": {
+            "nll": 3.6299517630891405,
+            "perplexity": 37.7109975112827,
+            "last_word_accuracy": 0.48828125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.625,
+            "accuracy_norm": 0.59375
+          }
+        }
+      }
+    },
+    {
+      "id": "fit_c24576_r0.5",
+      "seconds": 111.9331080224365,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.225663340975124,
+            "perplexity": 25.17026508750416,
+            "last_word_accuracy": 0.640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.7265625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.477888643867635,
+            "perplexity": 88.04857438742434,
+            "last_word_accuracy": 0.2578125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.40625,
+            "accuracy_norm": 0.3984375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.6401036480868165,
+            "perplexity": 38.09578507601489
+          },
+          "lambada": {
+            "nll": 4.527148630920162,
+            "perplexity": 92.49444890873701,
+            "last_word_accuracy": 0.25390625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.375,
+            "accuracy_norm": 0.3828125
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.4788840717532166,
+            "perplexity": 32.42351955857933
+          },
+          "lambada": {
+            "nll": 4.379177212131121,
+            "perplexity": 79.77237065668443,
+            "last_word_accuracy": 0.25390625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.359375,
+            "accuracy_norm": 0.3828125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.480003819773575,
+            "perplexity": 32.45984606488925
+          },
+          "lambada": {
+            "nll": 4.3865025199515175,
+            "perplexity": 80.35887336108219,
+            "last_word_accuracy": 0.25
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3203125,
+            "accuracy_norm": 0.359375
+          }
+        }
+      }
+    },
+    {
+      "id": "fit_c28672_r0.25",
+      "seconds": 119.02379243448377,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.225663340975124,
+            "perplexity": 25.17026508750416,
+            "last_word_accuracy": 0.640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.7265625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.965105564393643,
+            "perplexity": 19.396750739628466
+          },
+          "lambada": {
+            "nll": 3.6373629634680715,
+            "perplexity": 37.99151948862847,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6015625,
+            "accuracy_norm": 0.609375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.9469515656771725,
+            "perplexity": 19.047799168329988
+          },
+          "lambada": {
+            "nll": 3.6306870697416507,
+            "perplexity": 37.738736855838006,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.5859375,
+            "accuracy_norm": 0.5625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.9461122053709983,
+            "perplexity": 19.03181790974343
+          },
+          "lambada": {
+            "nll": 3.6467788733273387,
+            "perplexity": 38.35093366182991,
+            "last_word_accuracy": 0.47265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.578125,
+            "accuracy_norm": 0.59375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.9473827720388273,
+            "perplexity": 19.056014471625122
+          },
+          "lambada": {
+            "nll": 3.6498834392505706,
+            "perplexity": 38.470181674479505,
+            "last_word_accuracy": 0.47265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.59375,
+            "accuracy_norm": 0.6171875
+          }
+        }
+      }
+    },
+    {
+      "id": "fit_c28672_r0.5",
+      "seconds": 112.20263066142797,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.225663340975124,
+            "perplexity": 25.17026508750416,
+            "last_word_accuracy": 0.640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.7265625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.477888643867635,
+            "perplexity": 88.04857438742434,
+            "last_word_accuracy": 0.2578125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.40625,
+            "accuracy_norm": 0.3984375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.6432212523518244,
+            "perplexity": 38.21473798574961
+          },
+          "lambada": {
+            "nll": 4.455251587789096,
+            "perplexity": 86.07780424561898,
+            "last_word_accuracy": 0.26953125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3828125,
+            "accuracy_norm": 0.375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.5492282464312948,
+            "perplexity": 34.78646055039407
+          },
+          "lambada": {
+            "nll": 4.428875381621598,
+            "perplexity": 83.83707915321683,
+            "last_word_accuracy": 0.265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.421875,
+            "accuracy_norm": 0.4296875
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.557265679197069,
+            "perplexity": 35.067181012931115
+          },
+          "lambada": {
+            "nll": 4.440467538204589,
+            "perplexity": 84.81458646485738,
+            "last_word_accuracy": 0.2734375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.40625,
+            "accuracy_norm": 0.4140625
+          }
+        }
+      }
+    },
+    {
+      "id": "fit_c32768_r0.25",
+      "seconds": 121.97624702751637,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.225663340975124,
+            "perplexity": 25.17026508750416,
+            "last_word_accuracy": 0.640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.7265625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.965105564393643,
+            "perplexity": 19.396750739628466
+          },
+          "lambada": {
+            "nll": 3.6373629634680715,
+            "perplexity": 37.99151948862847,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6015625,
+            "accuracy_norm": 0.609375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.9441898554971773,
+            "perplexity": 18.995267239829765
+          },
+          "lambada": {
+            "nll": 3.6441792961271298,
+            "perplexity": 38.25136692086177,
+            "last_word_accuracy": 0.45703125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.578125,
+            "accuracy_norm": 0.5859375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.9190355625637823,
+            "perplexity": 18.52341416822613
+          },
+          "lambada": {
+            "nll": 3.6207481747431958,
+            "perplexity": 37.3655133000173,
+            "last_word_accuracy": 0.46484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.578125,
+            "accuracy_norm": 0.6171875
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.9191147231309147,
+            "perplexity": 18.524880550235963
+          },
+          "lambada": {
+            "nll": 3.62215120981368,
+            "perplexity": 37.417975219954656,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6015625,
+            "accuracy_norm": 0.6171875
+          }
+        }
+      }
+    },
+    {
+      "id": "fit_c32768_r0.5",
+      "seconds": 113.14837803132832,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.225663340975124,
+            "perplexity": 25.17026508750416,
+            "last_word_accuracy": 0.640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.7265625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.477888643867635,
+            "perplexity": 88.04857438742434,
+            "last_word_accuracy": 0.2578125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.40625,
+            "accuracy_norm": 0.3984375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.636510931115794,
+            "perplexity": 37.95916327114147
+          },
+          "lambada": {
+            "nll": 4.48190399841935,
+            "perplexity": 88.4028313891192,
+            "last_word_accuracy": 0.25
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3828125,
+            "accuracy_norm": 0.375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.4781884008657675,
+            "perplexity": 32.40097130394531
+          },
+          "lambada": {
+            "nll": 4.385030265958797,
+            "perplexity": 80.24065173640936,
+            "last_word_accuracy": 0.2421875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.359375,
+            "accuracy_norm": 0.40625
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.478280871814944,
+            "perplexity": 32.40396759104865
+          },
+          "lambada": {
+            "nll": 4.388475695965086,
+            "perplexity": 80.5175921009843,
+            "last_word_accuracy": 0.25
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.390625,
+            "accuracy_norm": 0.3984375
+          }
+        }
+      }
+    },
+    {
+      "id": "fit_c36864_r0.25",
+      "seconds": 119.51179297827184,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.225663340975124,
+            "perplexity": 25.17026508750416,
+            "last_word_accuracy": 0.640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.7265625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.965105564393643,
+            "perplexity": 19.396750739628466
+          },
+          "lambada": {
+            "nll": 3.6373629634680715,
+            "perplexity": 37.99151948862847,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6015625,
+            "accuracy_norm": 0.609375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.9588110675550485,
+            "perplexity": 19.27504140478098
+          },
+          "lambada": {
+            "nll": 3.6579990069251784,
+            "perplexity": 38.78365934139161,
+            "last_word_accuracy": 0.4609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.5859375,
+            "accuracy_norm": 0.59375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.958572790814006,
+            "perplexity": 19.27044915786613
+          },
+          "lambada": {
+            "nll": 3.6453732241731425,
+            "perplexity": 38.297063574456836,
+            "last_word_accuracy": 0.4609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.5859375,
+            "accuracy_norm": 0.5625
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.96193315091665,
+            "perplexity": 19.335313729497887
+          },
+          "lambada": {
+            "nll": 3.6521882513641457,
+            "perplexity": 38.55895047361991,
+            "last_word_accuracy": 0.46875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.59375,
+            "accuracy_norm": 0.5859375
+          }
+        }
+      }
+    },
+    {
+      "id": "fit_c36864_r0.5",
+      "seconds": 111.38688141666353,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.225663340975124,
+            "perplexity": 25.17026508750416,
+            "last_word_accuracy": 0.640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.7265625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.640291486467634,
+            "perplexity": 38.10294159871332
+          },
+          "lambada": {
+            "nll": 4.477888643867635,
+            "perplexity": 88.04857438742434,
+            "last_word_accuracy": 0.2578125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.40625,
+            "accuracy_norm": 0.3984375
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.6624623203464215,
+            "perplexity": 38.95714985190596
+          },
+          "lambada": {
+            "nll": 4.530073795315652,
+            "perplexity": 92.76540648198235,
+            "last_word_accuracy": 0.24609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.40625,
+            "accuracy_norm": 0.3671875
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.6248822258876494,
+            "perplexity": 37.52030397887733
+          },
+          "lambada": {
+            "nll": 4.451891701744386,
+            "perplexity": 85.78907794771959,
+            "last_word_accuracy": 0.21484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3828125,
+            "accuracy_norm": 0.390625
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.6360925349703974,
+            "perplexity": 37.943284625560025
+          },
+          "lambada": {
+            "nll": 4.47178032342772,
+            "perplexity": 87.51238475700029,
+            "last_word_accuracy": 0.23046875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.40625,
+            "accuracy_norm": 0.390625
+          }
+        }
+      }
+    },
+    {
+      "id": "stress_q15_r0.1_s512",
+      "seconds": 211.43364912830293,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.223414206753207,
+            "perplexity": 25.11371739843016,
+            "last_word_accuracy": 0.6328125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.75390625,
+            "accuracy_norm": 0.68359375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.661385765747548,
+            "perplexity": 14.316114139686402
+          },
+          "lambada": {
+            "nll": 3.3612072934202635,
+            "perplexity": 28.823968869360975,
+            "last_word_accuracy": 0.53515625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.67578125,
+            "accuracy_norm": 0.65625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.656682406386284,
+            "perplexity": 14.248938409865548
+          },
+          "lambada": {
+            "nll": 3.3557765372617254,
+            "perplexity": 28.66785720877596,
+            "last_word_accuracy": 0.53125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.65234375,
+            "accuracy_norm": 0.64453125
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.6525122610790155,
+            "perplexity": 14.189641989497579
+          },
+          "lambada": {
+            "nll": 3.3543850367134955,
+            "perplexity": 28.627993611294485,
+            "last_word_accuracy": 0.5546875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.66015625,
+            "accuracy_norm": 0.6328125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.6522801636249818,
+            "perplexity": 14.18634899188113
+          },
+          "lambada": {
+            "nll": 3.3532411672156264,
+            "perplexity": 28.595265644447373,
+            "last_word_accuracy": 0.560546875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6640625,
+            "accuracy_norm": 0.62890625
+          }
+        }
+      }
+    },
+    {
+      "id": "stress_q15_r0.1_s2048",
+      "seconds": 210.32418642565608,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.207161579588651,
+            "perplexity": 9.089878843826728
+          },
+          "lambada": {
+            "nll": 3.223414206753207,
+            "perplexity": 25.11371739843016,
+            "last_word_accuracy": 0.6328125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.75390625,
+            "accuracy_norm": 0.68359375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.371511201248206,
+            "perplexity": 10.713570417812399
+          },
+          "lambada": {
+            "nll": 3.3612072934202635,
+            "perplexity": 28.823968869360975,
+            "last_word_accuracy": 0.53515625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.67578125,
+            "accuracy_norm": 0.65625
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.369266198796066,
+            "perplexity": 10.689545404151103
+          },
+          "lambada": {
+            "nll": 3.3557765372617254,
+            "perplexity": 28.66785720877596,
+            "last_word_accuracy": 0.53125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.65234375,
+            "accuracy_norm": 0.64453125
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.3655341092003925,
+            "perplexity": 10.649725415068628
+          },
+          "lambada": {
+            "nll": 3.3543850367134955,
+            "perplexity": 28.627993611294485,
+            "last_word_accuracy": 0.5546875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.66015625,
+            "accuracy_norm": 0.6328125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.3656093670090756,
+            "perplexity": 10.650526920225825
+          },
+          "lambada": {
+            "nll": 3.3532411672156264,
+            "perplexity": 28.595265644447373,
+            "last_word_accuracy": 0.560546875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.6640625,
+            "accuracy_norm": 0.62890625
+          }
+        }
+      }
+    },
+    {
+      "id": "stress_q15_r0.75_s512",
+      "seconds": 189.2929939739406,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.499134099180218,
+            "perplexity": 12.171949694998897
+          },
+          "lambada": {
+            "nll": 3.223414206753207,
+            "perplexity": 25.11371739843016,
+            "last_word_accuracy": 0.6328125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.75390625,
+            "accuracy_norm": 0.68359375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 5.892918551271443,
+            "perplexity": 362.46160493755497
+          },
+          "lambada": {
+            "nll": 7.506731365595741,
+            "perplexity": 1820.2540633866904,
+            "last_word_accuracy": 0.0390625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.27734375,
+            "accuracy_norm": 0.26171875
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 5.903493168302711,
+            "perplexity": 366.3148349075163
+          },
+          "lambada": {
+            "nll": 7.101919919073967,
+            "perplexity": 1214.2961883355176,
+            "last_word_accuracy": 0.041015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.27734375,
+            "accuracy_norm": 0.2890625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 4.789877333519743,
+            "perplexity": 120.28661262280573
+          },
+          "lambada": {
+            "nll": 6.198798613540104,
+            "perplexity": 492.157414524394,
+            "last_word_accuracy": 0.060546875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3125,
+            "accuracy_norm": 0.3203125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 4.736130100407013,
+            "perplexity": 113.9922085956934
+          },
+          "lambada": {
+            "nll": 6.223687091371118,
+            "perplexity": 504.5601660082,
+            "last_word_accuracy": 0.056640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.30078125,
+            "accuracy_norm": 0.3046875
+          }
+        }
+      }
+    },
+    {
+      "id": "stress_q15_r0.75_s2048",
+      "seconds": 189.03370687179267,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.207161579588651,
+            "perplexity": 9.089878843826728
+          },
+          "lambada": {
+            "nll": 3.223414206753207,
+            "perplexity": 25.11371739843016,
+            "last_word_accuracy": 0.6328125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.75390625,
+            "accuracy_norm": 0.68359375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 5.477881300664845,
+            "perplexity": 239.33908225719063
+          },
+          "lambada": {
+            "nll": 7.506731365595741,
+            "perplexity": 1820.2540633866904,
+            "last_word_accuracy": 0.0390625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.27734375,
+            "accuracy_norm": 0.26171875
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 5.452367919564073,
+            "perplexity": 233.30997158030323
+          },
+          "lambada": {
+            "nll": 7.101919919073967,
+            "perplexity": 1214.2961883355176,
+            "last_word_accuracy": 0.041015625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.27734375,
+            "accuracy_norm": 0.2890625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 4.610592140007672,
+            "perplexity": 100.54366794137164
+          },
+          "lambada": {
+            "nll": 6.198798613540104,
+            "perplexity": 492.157414524394,
+            "last_word_accuracy": 0.060546875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3125,
+            "accuracy_norm": 0.3203125
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 4.559072415305745,
+            "perplexity": 95.49485916509268
+          },
+          "lambada": {
+            "nll": 6.223687091371118,
+            "perplexity": 504.5601660082,
+            "last_word_accuracy": 0.056640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.30078125,
+            "accuracy_norm": 0.3046875
+          }
+        }
+      }
+    },
+    {
+      "id": "stress_q05_r0.1_s512",
+      "seconds": 169.90604244358838,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.842176196626488,
+            "perplexity": 17.15305336647603
+          },
+          "lambada": {
+            "nll": 3.464391202849919,
+            "perplexity": 31.956998520129744,
+            "last_word_accuracy": 0.51171875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.65625,
+            "accuracy_norm": 0.5625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.9888559143603897,
+            "perplexity": 19.86294457733305
+          },
+          "lambada": {
+            "nll": 3.6184104821840126,
+            "perplexity": 37.278266235744624,
+            "last_word_accuracy": 0.466796875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.625,
+            "accuracy_norm": 0.54296875
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.977766544618252,
+            "perplexity": 19.64389385277878
+          },
+          "lambada": {
+            "nll": 3.6053854611183116,
+            "perplexity": 36.795864499104624,
+            "last_word_accuracy": 0.470703125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.60546875,
+            "accuracy_norm": 0.52734375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.9769879544551126,
+            "perplexity": 19.62860526280446
+          },
+          "lambada": {
+            "nll": 3.605935183593879,
+            "perplexity": 36.816097573606086,
+            "last_word_accuracy": 0.47265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.58984375,
+            "accuracy_norm": 0.48046875
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.9769234181383584,
+            "perplexity": 19.627338545792842
+          },
+          "lambada": {
+            "nll": 3.6037632604772805,
+            "perplexity": 36.73622261275916,
+            "last_word_accuracy": 0.474609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.59375,
+            "accuracy_norm": 0.48828125
+          }
+        }
+      }
+    },
+    {
+      "id": "stress_q05_r0.1_s2048",
+      "seconds": 158.46946569904685,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.541371787648464,
+            "perplexity": 12.6970767226264
+          },
+          "lambada": {
+            "nll": 3.464391202849919,
+            "perplexity": 31.956998520129744,
+            "last_word_accuracy": 0.51171875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.65625,
+            "accuracy_norm": 0.5625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.6928564536612267,
+            "perplexity": 14.77381642761134
+          },
+          "lambada": {
+            "nll": 3.6184104821840126,
+            "perplexity": 37.278266235744624,
+            "last_word_accuracy": 0.466796875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.625,
+            "accuracy_norm": 0.54296875
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.683754537533013,
+            "perplexity": 14.639956504622383
+          },
+          "lambada": {
+            "nll": 3.6053854611183116,
+            "perplexity": 36.795864499104624,
+            "last_word_accuracy": 0.470703125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.60546875,
+            "accuracy_norm": 0.52734375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.680928374245275,
+            "perplexity": 14.598640008098014
+          },
+          "lambada": {
+            "nll": 3.605935183593879,
+            "perplexity": 36.816097573606086,
+            "last_word_accuracy": 0.47265625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.58984375,
+            "accuracy_norm": 0.48046875
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.6808714687271005,
+            "perplexity": 14.597809288560198
+          },
+          "lambada": {
+            "nll": 3.6037632604772805,
+            "perplexity": 36.73622261275916,
+            "last_word_accuracy": 0.474609375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.59375,
+            "accuracy_norm": 0.48828125
+          }
+        }
+      }
+    },
+    {
+      "id": "stress_q05_r0.75_s512",
+      "seconds": 154.4292970560491,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.842176196626488,
+            "perplexity": 17.15305336647603
+          },
+          "lambada": {
+            "nll": 3.464391202849919,
+            "perplexity": 31.956998520129744,
+            "last_word_accuracy": 0.51171875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.65625,
+            "accuracy_norm": 0.5625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 5.441305201580846,
+            "perplexity": 230.74315333323884
+          },
+          "lambada": {
+            "nll": 6.405568347655735,
+            "perplexity": 605.2056681733197,
+            "last_word_accuracy": 0.048828125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.30859375,
+            "accuracy_norm": 0.32421875
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 5.10709474418028,
+            "perplexity": 165.1897386057364
+          },
+          "lambada": {
+            "nll": 6.1626534982263985,
+            "perplexity": 474.6859835829689,
+            "last_word_accuracy": 0.052734375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.28515625,
+            "accuracy_norm": 0.28515625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 4.536275367214255,
+            "perplexity": 93.34248536857437
+          },
+          "lambada": {
+            "nll": 5.677823909863655,
+            "perplexity": 292.3126386665204,
+            "last_word_accuracy": 0.0703125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3203125,
+            "accuracy_norm": 0.2890625
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 4.536338608325577,
+            "perplexity": 93.34838863774532
+          },
+          "lambada": {
+            "nll": 5.653343733322584,
+            "perplexity": 285.2436517122011,
+            "last_word_accuracy": 0.06640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.2890625,
+            "accuracy_norm": 0.29296875
+          }
+        }
+      }
+    },
+    {
+      "id": "stress_q05_r0.75_s2048",
+      "seconds": 153.76929488405585,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.541371787648464,
+            "perplexity": 12.6970767226264
+          },
+          "lambada": {
+            "nll": 3.464391202849919,
+            "perplexity": 31.956998520129744,
+            "last_word_accuracy": 0.51171875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.65625,
+            "accuracy_norm": 0.5625
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 5.249722524101582,
+            "perplexity": 190.51339824752515
+          },
+          "lambada": {
+            "nll": 6.405568347655735,
+            "perplexity": 605.2056681733197,
+            "last_word_accuracy": 0.048828125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.30859375,
+            "accuracy_norm": 0.32421875
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 4.84219329043837,
+            "perplexity": 126.74704016438632
+          },
+          "lambada": {
+            "nll": 6.1626534982263985,
+            "perplexity": 474.6859835829689,
+            "last_word_accuracy": 0.052734375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.28515625,
+            "accuracy_norm": 0.28515625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 4.220674769145777,
+            "perplexity": 68.07940667726066
+          },
+          "lambada": {
+            "nll": 5.677823909863655,
+            "perplexity": 292.3126386665204,
+            "last_word_accuracy": 0.0703125
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3203125,
+            "accuracy_norm": 0.2890625
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 4.222973844512358,
+            "perplexity": 68.2361064273686
+          },
+          "lambada": {
+            "nll": 5.653343733322584,
+            "perplexity": 285.2436517122011,
+            "last_word_accuracy": 0.06640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.2890625,
+            "accuracy_norm": 0.29296875
+          }
+        }
+      }
+    },
+    {
+      "id": "stress_q7i_r0.1_s512",
+      "seconds": 599.0675068404526,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.2928328094183814,
+            "perplexity": 9.902951157328323
+          },
+          "lambada": {
+            "nll": 3.1584986412413563,
+            "perplexity": 23.535234560116336,
+            "last_word_accuracy": 0.6875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.82421875,
+            "accuracy_norm": 0.7734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.4058177391843554,
+            "perplexity": 11.087493253797792
+          },
+          "lambada": {
+            "nll": 3.240653605551042,
+            "perplexity": 25.550416184818538,
+            "last_word_accuracy": 0.69140625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.79296875,
+            "accuracy_norm": 0.75
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.3967430745552196,
+            "perplexity": 10.98733311810621
+          },
+          "lambada": {
+            "nll": 3.2294131822672836,
+            "perplexity": 25.264826771712865,
+            "last_word_accuracy": 0.6875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.75390625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.398382018923526,
+            "perplexity": 11.005355510658005
+          },
+          "lambada": {
+            "nll": 3.224929234473133,
+            "perplexity": 25.151794212870676,
+            "last_word_accuracy": 0.681640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.7890625,
+            "accuracy_norm": 0.75
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.398074103428193,
+            "perplexity": 11.0019673128307
+          },
+          "lambada": {
+            "nll": 3.222837391525967,
+            "perplexity": 25.099235600884338,
+            "last_word_accuracy": 0.677734375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.78515625,
+            "accuracy_norm": 0.75
+          }
+        }
+      }
+    },
+    {
+      "id": "stress_q7i_r0.1_s2048",
+      "seconds": 454.1440157741308,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 1.9940280439100093,
+            "perplexity": 7.345060481066228
+          },
+          "lambada": {
+            "nll": 3.1584986412413563,
+            "perplexity": 23.535234560116336,
+            "last_word_accuracy": 0.6875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.82421875,
+            "accuracy_norm": 0.7734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 2.1023319693501543,
+            "perplexity": 8.1852353919287
+          },
+          "lambada": {
+            "nll": 3.240653605551042,
+            "perplexity": 25.550416184818538,
+            "last_word_accuracy": 0.69140625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.79296875,
+            "accuracy_norm": 0.75
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 2.096205062381687,
+            "perplexity": 8.135238535613547
+          },
+          "lambada": {
+            "nll": 3.2294131822672836,
+            "perplexity": 25.264826771712865,
+            "last_word_accuracy": 0.6875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.796875,
+            "accuracy_norm": 0.75390625
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 2.0948541340271203,
+            "perplexity": 8.124255831298251
+          },
+          "lambada": {
+            "nll": 3.224929234473133,
+            "perplexity": 25.151794212870676,
+            "last_word_accuracy": 0.681640625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.7890625,
+            "accuracy_norm": 0.75
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 2.094943815752187,
+            "perplexity": 8.124984461247992
+          },
+          "lambada": {
+            "nll": 3.222837391525967,
+            "perplexity": 25.099235600884338,
+            "last_word_accuracy": 0.677734375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.78515625,
+            "accuracy_norm": 0.75
+          }
+        }
+      }
+    },
+    {
+      "id": "stress_q7i_r0.75_s512",
+      "seconds": 330.6464814711362,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 2.2928328094183814,
+            "perplexity": 9.902951157328323
+          },
+          "lambada": {
+            "nll": 3.1584986412413563,
+            "perplexity": 23.535234560116336,
+            "last_word_accuracy": 0.6875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.82421875,
+            "accuracy_norm": 0.7734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 4.34004873212303,
+            "perplexity": 76.71127755062474
+          },
+          "lambada": {
+            "nll": 5.373473890893899,
+            "perplexity": 215.6105758401928,
+            "last_word_accuracy": 0.134765625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.34765625,
+            "accuracy_norm": 0.328125
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 4.181510585628144,
+            "perplexity": 65.46466854816785
+          },
+          "lambada": {
+            "nll": 5.300795718785029,
+            "perplexity": 200.49628517811433,
+            "last_word_accuracy": 0.1484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.359375,
+            "accuracy_norm": 0.359375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 4.114443650217672,
+            "perplexity": 61.21814608447032
+          },
+          "lambada": {
+            "nll": 5.155090579938782,
+            "perplexity": 173.31150459339622,
+            "last_word_accuracy": 0.1484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.359375,
+            "accuracy_norm": 0.3359375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 4.094126191857743,
+            "perplexity": 59.98689920860291
+          },
+          "lambada": {
+            "nll": 5.140135591495136,
+            "perplexity": 170.7389174969731,
+            "last_word_accuracy": 0.130859375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3515625,
+            "accuracy_norm": 0.3359375
+          }
+        }
+      }
+    },
+    {
+      "id": "stress_q7i_r0.75_s2048",
+      "seconds": 333.7625615298748,
+      "scores": {
+        "original": {
+          "wiki_test": {
+            "nll": 1.9940280439100093,
+            "perplexity": 7.345060481066228
+          },
+          "lambada": {
+            "nll": 3.1584986412413563,
+            "perplexity": 23.535234560116336,
+            "last_word_accuracy": 0.6875
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.82421875,
+            "accuracy_norm": 0.7734375
+          }
+        },
+        "drop": {
+          "wiki_test": {
+            "nll": 3.8778789988016,
+            "perplexity": 48.321616097883144
+          },
+          "lambada": {
+            "nll": 5.373473890893899,
+            "perplexity": 215.6105758401928,
+            "last_word_accuracy": 0.134765625
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.34765625,
+            "accuracy_norm": 0.328125
+          }
+        },
+        "mean": {
+          "wiki_test": {
+            "nll": 3.7596382770994903,
+            "perplexity": 42.93289335896716
+          },
+          "lambada": {
+            "nll": 5.300795718785029,
+            "perplexity": 200.49628517811433,
+            "last_word_accuracy": 0.1484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.359375,
+            "accuracy_norm": 0.359375
+          }
+        },
+        "ridge": {
+          "wiki_test": {
+            "nll": 3.719069383525243,
+            "perplexity": 41.226010646543685
+          },
+          "lambada": {
+            "nll": 5.155090579938782,
+            "perplexity": 173.31150459339622,
+            "last_word_accuracy": 0.1484375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.359375,
+            "accuracy_norm": 0.3359375
+          }
+        },
+        "affine": {
+          "wiki_test": {
+            "nll": 3.700581948001267,
+            "perplexity": 40.470849438337495
+          },
+          "lambada": {
+            "nll": 5.140135591495136,
+            "perplexity": 170.7389174969731,
+            "last_word_accuracy": 0.130859375
+          },
+          "arc_easy": {
+            "accuracy_raw": 0.3515625,
+            "accuracy_norm": 0.3359375
+          }
+        }
+      }
+    }
+  ]
+}
