@@ -1,0 +1,82 @@
+[
+  {
+    "rationale": "Combine late-layer protection with mean compensation.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 1.0,
+      "mean_mix": 0.5,
+      "profile": "protect_late",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Combine early-layer protection with mean compensation.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 1.0,
+      "mean_mix": 0.5,
+      "profile": "protect_early",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Combine moderate shrinkage and norm control.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 0.75,
+      "mean_mix": 0.0,
+      "profile": "flat",
+      "row_norm_cap": 0.1
+    }
+  },
+  {
+    "rationale": "Concentrate affine repair in middle layers.",
+    "candidate": {
+      "basis": "affine",
+      "gain": 1.0,
+      "mean_mix": 0.0,
+      "profile": "middle",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Add a smaller mean term.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 1.0,
+      "mean_mix": 0.25,
+      "profile": "flat",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Add a larger mean term.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 1.0,
+      "mean_mix": 0.75,
+      "profile": "flat",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Test larger row-norm cap with mean compensation.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 1.0,
+      "mean_mix": 0.5,
+      "profile": "flat",
+      "row_norm_cap": 0.2
+    }
+  },
+  {
+    "rationale": "Test affine repair with a capped output-row update.",
+    "candidate": {
+      "basis": "affine",
+      "gain": 1.0,
+      "mean_mix": 0.0,
+      "profile": "flat",
+      "row_norm_cap": 0.1
+    }
+  }
+]

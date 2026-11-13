@@ -1,0 +1,122 @@
+[
+  {
+    "rationale": "Reproduce the selected ridge reference.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 1.0,
+      "mean_mix": 0.0,
+      "profile": "flat",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Test a fitted intercept at the selected regularization.",
+    "candidate": {
+      "basis": "affine",
+      "gain": 1.0,
+      "mean_mix": 0.0,
+      "profile": "flat",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Reduce correction strength to limit downstream distortion.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 0.75,
+      "mean_mix": 0.0,
+      "profile": "flat",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Test whether the selected ridge under-corrects.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 1.25,
+      "mean_mix": 0.0,
+      "profile": "flat",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Restore half the mean output while retaining covariance repair.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 1.0,
+      "mean_mix": 0.5,
+      "profile": "flat",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Shrink affine repair toward mean compensation.",
+    "candidate": {
+      "basis": "affine",
+      "gain": 0.75,
+      "mean_mix": 0.5,
+      "profile": "flat",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Concentrate repair toward earlier layers.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 1.0,
+      "mean_mix": 0.0,
+      "profile": "front",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Concentrate repair toward later layers.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 1.0,
+      "mean_mix": 0.0,
+      "profile": "back",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Reduce edits in late layers that determine output decisions.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 1.0,
+      "mean_mix": 0.0,
+      "profile": "protect_late",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Reduce early-layer edits to preserve input representations.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 1.0,
+      "mean_mix": 0.0,
+      "profile": "protect_early",
+      "row_norm_cap": null
+    }
+  },
+  {
+    "rationale": "Cap each output-row correction at five percent of its surviving weight norm.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 1.0,
+      "mean_mix": 0.0,
+      "profile": "flat",
+      "row_norm_cap": 0.05
+    }
+  },
+  {
+    "rationale": "Use a less restrictive per-row norm cap.",
+    "candidate": {
+      "basis": "ridge",
+      "gain": 1.0,
+      "mean_mix": 0.0,
+      "profile": "flat",
+      "row_norm_cap": 0.1
+    }
+  }
+]
