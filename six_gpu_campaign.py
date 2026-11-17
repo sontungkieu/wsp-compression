@@ -96,7 +96,7 @@ def worker(root, lane):
         'OMP_NUM_THREADS':'4','HF_HUB_OFFLINE':'1','TRANSFORMERS_OFFLINE':'1',
         'TOKENIZERS_PARALLELISM':'false','PYTHONDONTWRITEBYTECODE':'1'})
     try:
-        for job in plan['jobs'][lane::6]:
+        for job in plan['jobs'][lane::len(plan['devices'])]:
             if cancelled: raise InterruptedError('cancelled')
             remaining = plan['deadline_epoch'] - time.time()
             if remaining < 120: raise TimeoutError('campaign deadline reached')
