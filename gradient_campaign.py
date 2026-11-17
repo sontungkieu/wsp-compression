@@ -60,6 +60,15 @@ def foreign_process(uuid, expected_group):
     return False
 
 
+def await_idle(assignment, deadline):
+    stop = min(deadline - 35, time.time() + 60)
+    while time.time() < stop:
+        if assignment[0] in idle_devices([assignment]):
+            return True
+        time.sleep(3)
+    return False
+
+
 def jobs(slot, offload):
     models = ['q05', 'q15', 'q7i']
     if slot % 3 == 1:
@@ -118,7 +127,7 @@ def worker(args, assignment):
             if time.time() >= args.until - 120:
                 state['status'] = 'deadline'
                 break
-            if index not in idle_devices([assignment]):
+            if not await_idle(assignment, args.until):
                 state['status'] = 'device_became_busy'
                 break
             if digest(payload) != args.payload_sha:
@@ -131,7 +140,7 @@ def worker(args, assignment):
                     if digest(Path(model) / name) != expected:
                         raise RuntimeError('model hash differs from parent')
                 verified_models.add(model)
-            if index not in idle_devices([assignment]):
+            if not await_idle(assignment, args.until):
                 state['status'] = 'device_became_busy'
                 break
             folder = root / f'{number:03d}-{job["model"]}-p{job["period"]}-{job["objective"]}'
