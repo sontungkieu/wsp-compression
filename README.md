@@ -87,6 +87,12 @@ queue on explicitly assigned GPUs under a shared deadline. It pins the original
 data and checkpoint hashes, and each job fits physical weight patches from
 finite difference responses. `summarize_functional.py` audits the completed
 job receipts and reports paired outcomes by condition.
+Follow-up stages compare logit readouts, calibration coverage, subspace design,
+and calibration from model trajectories. The launcher can wait for a preceding
+queue on the same GPU UUIDs. `stage_math_assets.py` stages the pinned Qwen3.5
+and GSM8K assets via the configured HTTPS proxy. `natural_loop.py` uses a
+separate train shard to locate natural loops and scores held-out math examples
+after applying sparse projection or fitted patches.
 
 The earlier one-GPU campaign completed all 82 planned conditions in about
 3 hours 15 minutes with zero failed jobs. Its recovered metric summary is

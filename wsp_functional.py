@@ -90,20 +90,41 @@ def mean_kl(reference, measured):
     return float((p.exp() * (p - measured.log_softmax(-1))).sum(-1).mean())
 
 
-def compile_patch(patch, measure, edit_target, preserve_target, radius, preserve_weight):
+def fisher_readout(teacher, topk):
+    """Teacher Fisher coordinates on top-k categories and one tail event."""
+    top = teacher.topk(topk, dim=1).indices
+
+    def coarsen(logits):
+        selected = logits.gather(1, top)
+        tail = logits.scatter(1, top, -torch.inf).logsumexp(dim=1, keepdim=True)
+        return torch.cat((selected, tail), dim=1).double()
+
+    p = coarsen(teacher).softmax(-1)
+
+    def readout(logits):
+        z = coarsen(logits)
+        return (p.sqrt() * (z - (p * z).sum(-1, keepdim=True))).flatten()
+
+    return readout
+
+
+def compile_patch(patch, measure, edit_target, preserve_target, radius, preserve_weight,
+                  anchor=None):
     """Measure a finite-difference Jacobian and solve with the actual weight budget."""
     k = len(patch.groups)
     zero = torch.zeros(k, dtype=torch.float64)
-    patch.apply(zero)
+    if anchor is None:
+        anchor = zero
+    patch.apply(anchor)
     before_e, before_p = measure()
     bump = max(radius / 25, 1e-3)
     edit_columns, protect_columns = [], []
     for col in range(k):
         direction = zero.clone()
         direction[col] = bump
-        patch.apply(direction)
+        patch.apply(anchor + direction)
         plus_e, plus_p = measure()
-        patch.apply(-direction)
+        patch.apply(anchor - direction)
         minus_e, minus_p = measure()
         edit_columns.append((plus_e - minus_e) / (2 * bump))
         protect_columns.append((plus_p - minus_p) / (2 * bump))
@@ -115,15 +136,16 @@ def compile_patch(patch, measure, edit_target, preserve_target, radius, preserve
     pw = (preserve_weight / a_p.shape[0]) ** .5
     joint = torch.cat((ew * a_e, pw * a_p))
     requested = torch.cat((ew * desired_e, pw * desired_p))
-    answer = least_squares_ball(joint, requested, radius)
+    answer = least_squares_ball(joint, requested + joint @ anchor, radius)
     # Wholly held-out rows are not touched during either solve.
     patch.apply(answer)
     after_e, after_p = measure()
     patch.apply(zero)
-    edit_prediction = a_e @ answer
+    edit_prediction = a_e @ (answer - anchor)
     return answer, {
         'forward_probes_per_panel': 2 * k + 2,
         'radius': radius,
+        'anchor_norm': float(anchor.norm()),
         'finite_difference_step': bump,
         'fit_mse_before': float(desired_e.square().mean()),
         'fit_mse_linear': float((edit_prediction - desired_e).square().mean()),
@@ -153,44 +175,93 @@ def prepare_compression(model, install, choices, windows, config):
     edit, protect, test = [windows(start + d * count * seq, count, seq).tolist()
                            for d in (0, 1, 2)]
     teacher = [last_logits(model, panel) for panel in (edit, protect, test)]
-    selected = [v.topk(9, dim=1).indices for v in teacher[:2]]
-    teach_e, teach_p = [margins(v, s[:, 1:], s[:, :1]) for v, s in zip(teacher, selected)]
+    if program.get('readout') == 'fisher':
+        readouts = [fisher_readout(v, 32) for v in teacher[:2]]
+    else:
+        def readout_for(tokens):
+            return lambda logits: margins(logits, tokens[:, 1:], tokens[:, :1])
+        readouts = [readout_for(v.topk(9, dim=1).indices) for v in teacher[:2]]
+    teach_e, teach_p = [readout(v) for readout, v in zip(readouts, teacher)]
     install('drop')
     physical = [layer.mlp.down_proj for layer in model.model.layers]
-    blocks = groups(len(physical), program['directions'])
-    patch = Patch([
-        [(physical[i].weight, choices[i]['arms']['ridge'][0]) for i in block]
-        for block in blocks
-    ])
+    partitions = program.get('column_partitions', 1)
+    directions = program['directions']
+    if directions % partitions or not 1 <= directions // partitions <= len(physical):
+        raise ValueError('incompatible actuator partition')
+    blocks = []
+    for layer_group in groups(len(physical), directions // partitions):
+        for part in range(partitions):
+            slices = []
+            for i in layer_group:
+                width = physical[i].in_features
+                columns = slice(part * width // partitions, (part + 1) * width // partitions)
+                slices.append((i, columns))
+            blocks.append(slices)
+    patch = Patch([[(physical[i].weight[:, columns], choices[i]['arms']['ridge'][0][:, columns])
+                    for i, columns in block] for block in blocks])
 
     def measure():
-        return tuple(margins(last_logits(model, rows), tokens[:, 1:], tokens[:, :1])
-                     for rows, tokens in zip((edit, protect), selected))
+        return tuple(readout(last_logits(model, rows))
+                     for rows, readout in zip((edit, protect), readouts))
 
     coefficients, record = compile_patch(patch, measure, teach_e, teach_p,
-                                         float(patch.norms.norm()), program['preserve_weight'])
+                                         float(patch.norms.norm()), program['preserve_weight'],
+                                         anchor=patch.norms if program.get('anchor') == 'ridge' else None)
     zero = torch.zeros_like(coefficients)
     for name, values in [('drop', zero), ('ridge', patch.norms), ('function_fit', coefficients)]:
         patch.apply(values)
         record[name + '_heldout_teacher_kl'] = mean_kl(teacher[2], last_logits(model, test))
-    for i, block in enumerate(blocks):
-        factor = float(coefficients[i] / patch.norms[i])
-        for j in block:
-            delta, bias = choices[j]['arms']['ridge']
-            choices[j]['arms']['function_fit'] = (delta * factor, bias)
+    corrected = [torch.empty_like(choice['arms']['ridge'][0]) for choice in choices]
+    for index, block in enumerate(blocks):
+        factor = float(coefficients[index] / patch.norms[index])
+        for i, columns in block:
+            corrected[i][:, columns] = choices[i]['arms']['ridge'][0][:, columns] * factor
+    for i, choice in enumerate(choices):
+        choice['arms']['function_fit'] = (corrected[i], choice['arms']['ridge'][1])
     return record
 
 
-def repeat_rows(rows):
+def repeat_rows(rows, motifs=None):
     repeat, clean, target = [], [], []
-    for row in rows:
+    for index, row in enumerate(rows):
         if len(row) < 32:
             raise ValueError('loop probes need at least 32 tokens')
-        motif = row[-8:]
+        motif = row[-8:] if motifs is None else motifs[index % len(motifs)]
         repeat.append(row[:-24] + motif * 3)
-        clean.append(row)
+        clean.append(row[:-8] + motif)
         target.append(motif[0])
     return repeat, clean, torch.tensor(target, dtype=torch.long)[:, None]
+
+
+@torch.inference_mode()
+def trajectory_examples(model, initial_rows, source, penalty, eos, horizon=8):
+    """Select one fixed-time prefix per seed from an unedited or oracle trajectory."""
+    if source not in ('base', 'oracle'):
+        raise ValueError('unsupported trajectory source')
+    active = [row.copy() for row in initial_rows]
+    selected = [None] * len(active)
+    terminal = [False] * len(active)
+    triggered = [False] * len(active)
+    for step in range(horizon):
+        for i, row in enumerate(active):
+            if i % horizon == step:
+                selected[i] = row[-len(initial_rows[i]):]
+                triggered[i] = not terminal[i] and row[-16:-8] == row[-8:]
+        if step + 1 == horizon:
+            break
+        live = [i for i, ended in enumerate(terminal) if not ended]
+        if not live:
+            continue
+        logits = last_logits(model, [active[i] for i in live])
+        if source == 'oracle':
+            for j, i in enumerate(live):
+                row = active[i]
+                if row[-16:-8] == row[-8:]:
+                    logits[j, row[-8]] -= penalty
+        for i, token in zip(live, logits.argmax(-1).tolist()):
+            active[i].append(token)
+            terminal[i] = token == eos
+    return selected, triggered
 
 
 @torch.inference_mode()
@@ -230,7 +301,31 @@ def run_repetition(model, tokenizer, config, source_digest):
                     truncation=True, max_length=100000).input_ids
     n, seq, start = spec['rows'], spec['length'], spec['start']
     positive, negative, target = repeat_rows(calibration_rows(ids, start, n, seq))
-    test_pos, test_neg, test_target = repeat_rows(calibration_rows(ids, start + 2 * n * seq, n, seq))
+    test_rows = calibration_rows(ids, start + 2 * n * seq, n, seq)
+    test_pos, test_neg, test_target = repeat_rows(test_rows)
+    protected_copy = spec.get('protect_copy', False)
+    if protected_copy:
+        instruction = tokenizer('Continue copying this exact repeated sequence: ',
+                                add_special_tokens=False).input_ids
+        if len(instruction) >= seq - 24:
+            raise ValueError('copy prefix too long for matched context')
+        def copy_prompt(row):
+            return instruction + row[len(instruction):]
+        negative = [copy_prompt(positive[i]) if i % 2 else row for i, row in enumerate(negative)]
+        test_copy = [copy_prompt(row) for row in test_pos]
+    basis_examples = spec.get('basis_rows', 0)
+    if basis_examples:
+        basis_pos, basis_neg, basis_target = repeat_rows(
+            calibration_rows(ids, spec['basis_start'], basis_examples, seq))
+        if spec.get('basis_trajectory'):
+            basis_pos, triggered = trajectory_examples(
+                model, basis_pos, spec['basis_trajectory'], spec['penalty'], tokenizer.eos_token_id)
+            basis_target = torch.tensor([row[-8] for row in basis_pos])[:, None]
+        else:
+            triggered = [row[-16:-8] == row[-8:] for row in basis_pos]
+        active_trigger = torch.tensor(triggered, device='cpu')
+        if protected_copy:
+            basis_neg = [copy_prompt(basis_pos[i]) if i % 2 else row for i, row in enumerate(basis_neg)]
     blocks = groups(len(model.model.layers), spec['directions'])
     device = next(model.parameters()).device
     captures = {}
@@ -246,6 +341,9 @@ def run_repetition(model, tokenizer, config, source_digest):
             handles.append(model.model.layers[i].mlp.down_proj.register_forward_pre_hook(hook(i)))
     before_e = last_logits(model, positive)
     before_p = last_logits(model, negative)
+    if basis_examples:
+        basis_logits = last_logits(model, basis_pos)
+        last_logits(model, basis_neg)
     for handle in handles:
         handle.remove()
     base_reference = before_e.topk(2, dim=1).indices
@@ -255,18 +353,39 @@ def run_repetition(model, tokenizer, config, source_digest):
     preserved = margins(before_p, protect_ids[:, 1:], protect_ids[:, :1])
     directions = []
     unembedding = model.lm_head.weight.detach()
-    desired = unembedding[ref.flatten().to(device)].float() - unembedding[target.flatten().to(device)].float()
-    desired = desired / desired.norm(dim=1, keepdim=True).clamp_min(1e-12)
+    def direction_targets(reference_tokens, target_tokens):
+        reference = unembedding[reference_tokens.flatten().to(device)].float()
+        blocked = unembedding[target_tokens.flatten().to(device)].float()
+        difference = reference - blocked
+        return difference / difference.norm(dim=1, keepdim=True).clamp_min(1e-12)
+
+    def avoid_target(logits, blocked):
+        top = logits.topk(2, dim=1).indices
+        return torch.where(top[:, :1] == blocked, top[:, 1:], top[:, :1])
+
+    desired = direction_targets(ref, target)
     targets = torch.cat((desired, torch.zeros_like(desired)))
+    if basis_examples:
+        basis_desired = direction_targets(avoid_target(basis_logits, basis_target), basis_target)
+        basis_desired *= active_trigger.to(device)[:, None]
+        if spec.get('shuffled_basis'):
+            basis_desired = basis_desired.roll(basis_examples // 2, dims=0)
+        basis_outputs = torch.cat((basis_desired, torch.zeros_like(basis_desired)))
     genuine_norm_sq = 0.
     for block in blocks:
         changes = []
         for i in block:
             weight = model.model.layers[i].mlp.down_proj.weight
             act = torch.cat(captures[i])
-            delta, _, _ = fit_correction(act, targets, 1.0, False)
+            delta, _, _ = fit_correction(act[:2 * n], targets, 1.0, False)
             genuine_norm_sq += float(delta.double().square().sum())
-            if spec.get('shuffled_basis'):
+            if basis_examples:
+                basis_act = act[2 * n:]
+                if spec.get('paired_basis'):
+                    plus, minus = basis_act.chunk(2)
+                    basis_act = torch.cat((plus - minus, minus))
+                delta, _, _ = fit_correction(basis_act, basis_outputs, 1.0, False)
+            elif spec.get('shuffled_basis'):
                 delta, _, _ = fit_correction(act, targets.roll(n // 2, dims=0), 1.0, False)
             changes.append((weight, delta))
         directions.append(changes)
@@ -281,16 +400,33 @@ def run_repetition(model, tokenizer, config, source_digest):
 
     coefficients, diagnostics = compile_patch(patch, measure, requested, preserved,
                                                radius, spec['preserve_weight'])
+    if basis_examples:
+        diagnostics['basis_trigger_fraction'] = float(active_trigger.float().mean())
     test_before_pos = last_logits(model, test_pos)
     test_before_neg = last_logits(model, test_neg)
     top = test_before_pos.topk(2, dim=1).indices
     test_ref = torch.where(top[:, :1] == test_target, top[:, 1:], top[:, :1])
     train_tokens = set(target.flatten().tolist())
+    if basis_examples:
+        train_tokens.update(basis_target.flatten().tolist())
     initial_margin = margins(test_before_pos, test_target, test_ref)
     initial_negative = margins(test_before_neg, test_target, test_ref)
+    if protected_copy:
+        before_copy = last_logits(model, test_copy)
+        initial_copy = margins(before_copy, test_target, test_ref)
     seen = torch.tensor([int(x) in train_tokens for x in test_target.flatten()])
     records = {}
     generation_prompts = test_pos[:spec.get('generation_rows', 8)]
+    steps = spec.get('generation_steps', 24)
+    motif_transfer = spec.get('motif_transfer', False)
+    if motif_transfer:
+        familiar_motifs = [r[-8:] for r in positive]
+        familiar_pos, familiar_neg, familiar_target = repeat_rows(test_rows, familiar_motifs)
+        familiar_before = last_logits(model, familiar_pos)
+        familiar_reference = avoid_target(familiar_before, familiar_target)
+        familiar_initial_margin = margins(familiar_before, familiar_target, familiar_reference)
+        familiar_initial_clean = margins(last_logits(model, familiar_neg), familiar_target,
+                                         familiar_reference)
 
     for arm, c in [('original', torch.zeros_like(coefficients)),
                    ('local', patch.norms * (coefficients.norm() / patch.norms.norm())),
@@ -311,10 +447,22 @@ def run_repetition(model, tokenizer, config, source_digest):
             'eos_probability': float(p.softmax(-1)[:, tokenizer.eos_token_id].mean()),
             'per_example_shift': shift.tolist(),
             'per_example_false_shift': false_shift.tolist(),
-            'greedy_rollout': rollout(model, generation_prompts, tokenizer.eos_token_id, 24),
+            'greedy_rollout': rollout(model, generation_prompts, tokenizer.eos_token_id, steps),
         }
+        if protected_copy:
+            after_copy = last_logits(model, test_copy)
+            copy_change = margins(after_copy, test_target, test_ref) - initial_copy
+            records[arm].update(copy_target_shift=float(copy_change.mean()),
+                                copy_kl=mean_kl(before_copy, after_copy))
+        if motif_transfer:
+            familiar_shift = margins(last_logits(model, familiar_pos), familiar_target,
+                                     familiar_reference) - familiar_initial_margin
+            familiar_clean = margins(last_logits(model, familiar_neg), familiar_target,
+                                     familiar_reference) - familiar_initial_clean
+            records[arm].update(familiar_motif_shift=float(familiar_shift.mean()),
+                                familiar_clean_shift=float(familiar_clean.mean()))
     patch.apply(torch.zeros_like(coefficients))
-    oracle = rollout(model, generation_prompts, tokenizer.eos_token_id, 24, spec['penalty'])
+    oracle = rollout(model, generation_prompts, tokenizer.eos_token_id, steps, spec['penalty'])
     return {'spec': config, 'source_sha256': source_digest, 'functional': diagnostics,
             'oracle_rollout': oracle, 'results': records}
 
@@ -333,6 +481,16 @@ if __name__ == '__main__':
     patch.apply([0.])
     torch.testing.assert_close(parameter, torch.tensor([2., -1.]))
 
+    anchored, _ = compile_patch(patch, lambda: (parameter[1:].detach().double(),
+                                                  parameter[:1].detach().double()),
+                                torch.tensor([1.], dtype=torch.float64),
+                                torch.tensor([2.], dtype=torch.float64), 4., 1.,
+                                anchor=torch.tensor([3.], dtype=torch.float64))
+    torch.testing.assert_close(anchored, torch.tensor([2.], dtype=torch.float64), atol=2e-5, rtol=0)
+    logits = torch.tensor([[1., 2., 3., 4.]])
+    readout = fisher_readout(logits, 2)
+    torch.testing.assert_close(readout(logits), readout(logits + 5), atol=2e-6, rtol=0)
+
     @torch.inference_mode()
     def fake_logits(_model, rows):
         return torch.tensor([[1., 2., 0.] for _ in rows])
@@ -340,4 +498,13 @@ if __name__ == '__main__':
     last_logits = fake_logits
     assert rollout(None, [[1] * 16], 2, 1)['per_example_recurrence'] == [1]
     assert rollout(None, [[1] * 16], 2, 1, 2.)['per_example_recurrence'] == [0]
-    print('PASS: trust-region optimum, nullspace, patch reset and recurrence oracle')
+    _, base_triggers = trajectory_examples(None, [[1] * 16] * 2, 'base', 2., 2, horizon=2)
+    _, oracle_triggers = trajectory_examples(None, [[1] * 16] * 2, 'oracle', 2., 2, horizon=2)
+    assert base_triggers == [True, True] and oracle_triggers == [True, False]
+
+    family = torch.nn.Parameter(torch.zeros(1, 4))
+    partitioned = Patch([[(family[:, :2], torch.tensor([[1., 0.]]))],
+                         [(family[:, 2:], torch.tensor([[0., 1.]]))]])
+    partitioned.apply([1., 2.])
+    torch.testing.assert_close(family, torch.tensor([[1., 0., 0., 2.]]))
+    print('PASS: trust region, nullspace, partitioned patches and trajectory oracle')

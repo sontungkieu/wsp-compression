@@ -38,6 +38,11 @@ def paired_scores(result):
             'fit_target_shift': fit['target_shift'],
             'fit_clean_target_shift': fit['false_target_shift'],
             'fit_unseen_target_shift': fit['target_shift_unseen_token'],
+            'fit_familiar_motif_shift': fit.get('familiar_motif_shift'),
+            'fit_familiar_clean_shift': fit.get('familiar_clean_shift'),
+            'fit_copy_target_shift': fit.get('copy_target_shift'),
+            'fit_copy_kl': fit.get('copy_kl'),
+            'basis_trigger_fraction': record.get('basis_trigger_fraction'),
             'fit_clean_kl': fit['preservation_kl'],
             'local_clean_kl': local['preservation_kl'],
             'local_target_shift': local['target_shift'],
@@ -57,6 +62,10 @@ def collect(roots, cache=None):
         cache = {}
     data = {'observed_at': now(), 'roots': {}}
     for root in roots:
+        if not (root / 'plan.json').is_file():
+            data['roots'][root.name] = {'planned': None, 'workers': [{'status': 'unobserved'}],
+                                        'completed': [], 'failures': []}
+            continue
         plan = load(root / 'plan.json')
         evidence = {'planned': len(plan['jobs']), 'deadline_utc': plan['deadline_utc'],
                     'workers': [], 'completed': [], 'failures': []}
@@ -93,6 +102,62 @@ def collect(roots, cache=None):
     return data
 
 
+def collect_natural(roots):
+    result = {}
+    for root in roots:
+        record = {'status': 'unobserved', 'arm_scores': {}}
+        status_path = root / 'status.json'
+        if status_path.is_file():
+            record.update(load(status_path))
+        calibration_path = root / 'calibration.json'
+        if calibration_path.is_file():
+            calibration = load(calibration_path)
+            record['loop_pairs'] = len(calibration['loop_pair_ids'])
+            record['token_cap'] = calibration['token_cap']
+        for arm in ('original', 'sparse_projection', 'function_fit'):
+            path = root / (arm + '.json')
+            if path.is_file():
+                scores = load(path)['per_problem']
+                fields = ('correct', 'ended_thinking', 'hit_cap', 'length', 'repeat_steps')
+                record['arm_scores'][arm] = {'count': len(scores), **{
+                    field: statistics.mean(row[field] for row in scores) for field in fields}}
+        result[root.name] = record
+    return result
+
+
+def cohort_summary(completed):
+    groups = {}
+    for job in completed:
+        program = job['program']
+        if program['task'] == 'compression':
+            cohort = ('compression', job['model'], program.get('anchor', 'drop'),
+                      program.get('readout', 'margins'), program.get('column_partitions', 1))
+        else:
+            cohort = ('repeat', job['model'], program.get('basis_rows', 0),
+                      bool(program.get('paired_basis')), bool(program.get('shuffled_basis')),
+                      program.get('basis_trajectory') or 'fixed')
+        groups.setdefault(cohort, []).append(job['scores'])
+    reports = []
+    for cohort, scores in sorted(groups.items()):
+        keys = ('teacher_kl_fit_minus_ridge', 'wiki_test_fit_minus_ridge') if cohort[0] == 'compression' else (
+            'fit_target_shift', 'fit_clean_target_shift', 'fit_unseen_target_shift',
+            'fit_familiar_motif_shift', 'fit_clean_kl', 'original_recurrence', 'fit_recurrence',
+            'oracle_recurrence', 'fit_copy_target_shift', 'fit_copy_kl', 'basis_trigger_fraction')
+        medians = {}
+        for key in ('strict_unreachable', 'unprotected_unreachable', 'linearization_rmse', *keys):
+            values = [point[key] for point in scores if point.get(key) is not None]
+            if values:
+                medians[key] = statistics.median(values)
+        report = {'cohort': cohort, 'conditions': len(scores), 'medians': medians}
+        if cohort[0] == 'compression':
+            report['teacher_kl_improvements'] = sum(point['teacher_kl_fit_minus_ridge'] < 0 for point in scores)
+        else:
+            report['recurrence_improvements'] = sum(point['fit_recurrence'] < point['original_recurrence']
+                                                    for point in scores)
+        reports.append(report)
+    return reports
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('roots', nargs='+', type=Path)
@@ -100,24 +165,29 @@ def main():
     parser.add_argument('--watch', action='store_true')
     parser.add_argument('--detach', action='store_true')
     parser.add_argument('--compact', action='store_true')
+    parser.add_argument('--deadline', type=int)
+    parser.add_argument('--natural', type=Path, action='append', default=[])
     args = parser.parse_args()
     if (args.watch or args.detach) and args.output is None:
         parser.error('--watch and --detach require --output')
     if args.output and args.output.exists():
         raise SystemExit('fresh summary output required')
-    deadline = max(load(root / 'plan.json')['deadline_epoch'] for root in args.roots)
+    deadline = args.deadline if args.deadline is not None else max(
+        load(root / 'plan.json')['deadline_epoch'] for root in args.roots)
     if args.detach:
         log_path = args.output.with_suffix('.log')
         with log_path.open('x') as log:
+            natural_args = [arg for path in args.natural for arg in ('--natural', str(path))]
             child = subprocess.Popen([sys.executable, '-B', str(Path(__file__).resolve()),
-                                      '--watch', '--output', str(args.output),
-                                      *map(str, args.roots)], start_new_session=True,
+                                      '--watch', '--output', str(args.output), '--deadline', str(deadline),
+                                      *natural_args, *map(str, args.roots)], start_new_session=True,
                                      stdout=log, stderr=subprocess.STDOUT)
         print(json.dumps({'pid': child.pid, 'output': str(args.output)}))
         return
     cache = {}
     while True:
         evidence = collect(args.roots, cache)
+        evidence['natural'] = collect_natural(args.natural)
         if args.output:
             save(args.output, evidence)
         elif args.compact:
@@ -125,13 +195,18 @@ def main():
                 completed = report['completed']
                 print(json.dumps({'root': name, 'planned': report['planned'],
                                   'workers': report['workers'], 'failures': report['failures'],
-                                  'completed': len(completed), 'examples': completed[:2]}))
+                                  'completed': len(completed), 'cohorts': cohort_summary(completed)}))
+            if evidence['natural']:
+                print(json.dumps({'natural': evidence['natural']}))
         else:
             print(json.dumps(evidence))
-        if not args.watch or time.time() >= deadline + 60 or all(
+        planned_complete = all(
             w['status'] not in ('running', 'unobserved')
             for root in evidence['roots'].values() for w in root['workers']
-        ):
+        )
+        natural_complete = all(row['status'] in ('completed', 'failed')
+                               for row in evidence['natural'].values())
+        if not args.watch or time.time() >= deadline + 60 or (planned_complete and natural_complete):
             break
         time.sleep(120)
 

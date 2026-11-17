@@ -75,6 +75,110 @@ def validate_inputs(parent, used_models):
                 raise SystemExit('model hash mismatch: ' + name)
 
 
+def build_followup(role, models, candidate):
+    jobs = []
+
+    def add(task, model, start, label, program, **kwargs):
+        overrides, _ = condition(task, models[model], start=start, label=label, **kwargs)
+        overrides['functional'].update(program)
+        overrides['candidate'] = candidate
+        jobs.append({'id': f'{len(jobs):03d}_{model}_{label}_s{start}', 'group': task,
+                     'overrides': overrides})
+
+    for start in (24576, 36864, 49152):
+        if role == 'compression':
+            settings = [(anchor, readout, 32, .5) for anchor in ('drop', 'ridge')
+                        for readout in ('margins', 'fisher')]
+            settings += [('ridge', 'fisher', 64, fraction) for fraction in (.25, .5, .75)]
+            for anchor, readout, rows, fraction in settings:
+                for model in ('q05', 'q15'):
+                    add(role, model, start, f'{anchor}_{readout}_n{rows}_p{fraction}',
+                        {'anchor': anchor, 'readout': readout}, rows=rows, fraction=fraction)
+        elif role in ('repeat', 'controls'):
+            settings = [(0, False, False), (64, False, False), (256, False, False),
+                        (512, False, False), (256, True, False), (512, True, False)]
+            if role == 'controls':
+                settings = [(256, True, False), (256, True, True)]
+            for basis_rows, paired, shuffled in settings:
+                for model in ('q05', 'q15'):
+                    add('repeat', model, start, f'crossfit_n{basis_rows}_pair{int(paired)}_shuf{int(shuffled)}',
+                        {'basis_rows': basis_rows, 'basis_start': 62500, 'paired_basis': paired,
+                         'shuffled_basis': shuffled, 'motif_transfer': True}, rows=32)
+    return jobs
+
+
+def wait_for_queue(root, deadline, uuids, role):
+    plan_path = root / 'plan.json'
+    while not plan_path.is_file():
+        if time.time() >= deadline - 120:
+            raise SystemExit('preceding queue never became ready within the allocation')
+        time.sleep(15)
+    parent = json.loads(plan_path.read_text())
+    if parent['role'] != role or parent['host'] != socket.gethostname():
+        raise SystemExit('preceding queue role or host differs')
+    if parent['deadline_epoch'] != deadline or [d['uuid'] for d in parent['devices']] != uuids:
+        raise SystemExit('preceding queue has different deadline or assigned devices')
+    states = ('completed_all_planned', 'budget_exhausted', 'failed', 'cancelled')
+    while time.time() < deadline - 120:
+        paths = [root / f'lane{i}' / 'progress.json' for i in range(len(uuids))]
+        if all(p.is_file() and json.loads(p.read_text())['status'] in states for p in paths):
+            if any(json.loads(p.read_text())['status'] == 'cancelled' for p in paths):
+                raise SystemExit('preceding queue was cancelled')
+            return
+        time.sleep(15)
+    raise SystemExit('original budget exhausted while waiting')
+
+
+def build_basis_study(role, models, candidate):
+    if role != 'compression':
+        raise ValueError('the basis study requires a compression queue')
+    jobs = []
+    for start in (24576, 36864, 49152):
+        for fraction in (.25, .5, .75):
+            for directions, parts in ((8, 1), (16, 1), (16, 2), (32, 4)):
+                for model in ('q15', 'q7i'):
+                    label = f's{start}_p{fraction}_k{directions}_part{parts}'
+                    overrides, _ = condition(role, models[model], start=start, label=label,
+                                             directions=directions, fraction=fraction, rows=64)
+                    overrides['functional'].update(anchor='ridge', readout='fisher',
+                                                   column_partitions=parts)
+                    overrides['candidate'] = candidate
+                    jobs.append({'id': f'{len(jobs):03d}_{model}_{label}', 'group': role,
+                                 'overrides': overrides})
+    return jobs
+
+
+def build_trajectory_study(role, models, candidate):
+    if role != 'controls':
+        raise ValueError('the trajectory study uses the controls GPU')
+    jobs = []
+    for start in (24576, 36864, 49152):
+        for source in (None, 'base', 'oracle'):
+            for model in ('q05', 'q15'):
+                label = f's{start}_source{source or "fixed"}'
+                overrides, _ = condition('repeat', models[model], start=start, label=label, rows=32)
+                overrides['functional'].update(
+                    basis_rows=256, basis_start=62500, paired_basis=True, protect_copy=True,
+                    motif_transfer=True, basis_trajectory=source, generation_steps=64,
+                )
+                overrides['candidate'] = candidate
+                jobs.append({'id': f'{len(jobs):03d}_{model}_{label}', 'group': 'repeat',
+                             'overrides': overrides})
+    return jobs
+
+
+def wait_for_natural(root, deadline, uuids):
+    schedule = json.loads((root / 'schedule.json').read_text())
+    if schedule['deadline'] != deadline or schedule['gpu'] != 0 or [schedule['uuid']] != uuids:
+        raise SystemExit('natural trial has different deadline or assigned device')
+    while time.time() < deadline - 120:
+        status = root / 'status.json'
+        if status.is_file() and json.loads(status.read_text())['status'] in ('completed', 'failed'):
+            return
+        time.sleep(15)
+    raise SystemExit('natural trial did not release its device before the deadline')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--role', required=True, choices=('compression', 'repeat', 'controls'))
@@ -82,6 +186,9 @@ def main():
     parser.add_argument('--root', required=True, type=Path)
     parser.add_argument('--parent-plan', required=True, type=Path)
     parser.add_argument('--deadline', required=True, type=int)
+    parser.add_argument('--stage', type=int, choices=(1, 2, 3, 4), default=1)
+    parser.add_argument('--after', type=Path)
+    parser.add_argument('--schedule', type=Path, help='fresh log file for waiting launcher')
     args = parser.parse_args()
     if len(args.uuid) != (1 if args.role == 'controls' else 2):
         raise SystemExit('incorrect number of GPU UUIDs for this role')
@@ -90,18 +197,39 @@ def main():
     if not 120 < args.deadline - time.time() <= 6 * 3600:
         raise SystemExit('deadline must fall within the six-hour allocation')
 
+    if args.schedule:
+        if not args.after:
+            parser.error('--schedule requires --after')
+        with args.schedule.open('x') as log:
+            child = subprocess.Popen([sys.executable, '-B', str(Path(__file__).resolve()),
+                                      '--role', args.role, '--uuid', *args.uuid,
+                                      '--root', str(args.root), '--parent-plan', str(args.parent_plan),
+                                      '--deadline', str(args.deadline), '--stage', str(args.stage),
+                                      '--after', str(args.after)], stdout=log, stderr=subprocess.STDOUT,
+                                     start_new_session=True)
+        print(json.dumps({'status': 'waiting', 'pid': child.pid, 'after': str(args.after),
+                          'root': str(args.root)}))
+        return
+    if args.after:
+        if args.stage == 4:
+            wait_for_natural(args.after, args.deadline, args.uuid)
+        else:
+            wait_for_queue(args.after, args.deadline, args.uuid, args.role)
+
     parent = json.loads(args.parent_plan.read_text())
     config = parent['config']
     source_dir = Path(__file__).resolve().parent
     config['source'] = str(source_dir / 'recovery.py')
     config['base_spec'].update(wiki_validation_windows=0)
-    jobs = build_jobs(args.role, config['models'], parent['selection']['candidate'])
+    builder = {1: build_jobs, 2: build_followup, 3: build_basis_study,
+               4: build_trajectory_study}[args.stage]
+    jobs = builder(args.role, config['models'], parent['selection']['candidate'])
     validate_inputs(parent, {job['overrides']['model'] for job in jobs})
     devices = [queue.device(gpu, uuid) for gpu, uuid in enumerate(args.uuid)]
     worker_path = Path(queue.__file__).resolve()
     functional = source_dir / 'wsp_functional.py'
     plan = {
-        'role': args.role, 'host': socket.gethostname(), 'started_at': queue.now(),
+        'role': args.role, 'stage': args.stage, 'host': socket.gethostname(), 'started_at': queue.now(),
         'parent_plan_sha256': queue.sha(args.parent_plan),
         'config': config, 'jobs': jobs, 'devices': devices,
         'data_sha256': parent['data_sha256'],
