@@ -67,6 +67,16 @@ containing `gpu` and `uuid`, local `models`, expected `model_sha256` mappings,
 `input_files` and `base_spec`. Consult `make_spec` in `campaign.py` and the
 specification reads in `recovery.py` for all experiment fields.
 
+The separate `six_gpu_campaign.py` executes a seven-hour robustness grid on
+GPU indices 2–7. It reads the earlier plan and frozen selection, verifies the
+original source, dataset and model weight hashes, maps the documented storage
+move, and records the resulting job specs and device UUIDs. Each independent
+worker checks GPU occupancy before each job and stops its lane on failure. Its
+120 jobs vary mask samples, fitting offsets and sizes, model, pruning fraction,
+and context. They reuse previously observed test regions and are diagnostics,
+not fresh confirmatory tests. `canary_six_gpu.py` checks the current runtime
+with one small matched experiment before the full campaign.
+
 The earlier one-GPU campaign completed all 82 planned conditions in about
 3 hours 15 minutes with zero failed jobs. Its recovered metric summary is
 available in `night6h_result_summary.json`.
