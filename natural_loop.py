@@ -25,6 +25,28 @@ def periodic_steps(tokens):
                     break
 
 
+def recurrent_steps(tokens):
+    """Repeated 16-token continuations within the last 2,048 tokens."""
+    last = {}
+    for end in range(15, len(tokens)):
+        ngram = tuple(tokens[end - 15:end + 1])
+        previous = last.get(ngram)
+        if previous is not None and end - previous <= 2048:
+            yield end
+        last[ngram] = end
+
+
+def onset(tokens, detector):
+    if detector == 'periodic':
+        return next((n for n in periodic_steps(tokens) if n >= 96), None)
+    recent = []
+    for n in recurrent_steps(tokens):
+        recent = [i for i in recent if n - i <= 128] + [n]
+        if n >= 96 and len(recent) >= 8:
+            return n
+    return None
+
+
 def number(text):
     match = re.fullmatch(r'\s*([-+]?\d+(?:\.\d+)?)\s*', text.replace(',', ''))
     return float(match[1]) if match else None
@@ -40,7 +62,8 @@ def score(tokenizer, rows, outputs, limit):
         results.append({'id': row['id'], 'correct': gold is not None and guess == gold,
                         'boxed_answer': guess, 'ended_thinking': '</think>' in completion,
                         'hit_cap': len(tokens) == limit, 'length': len(tokens),
-                        'repeat_steps': sum(1 for _ in periodic_steps(tokens))})
+                        'repeat_steps': sum(1 for _ in periodic_steps(tokens)),
+                        'recurrent_16gram_steps': sum(1 for _ in recurrent_steps(tokens))})
     return results
 
 
@@ -127,7 +150,7 @@ def run(args):
     positives, negatives, target = [], [], []
     train_rows = []
     for row, (prompt, tokens) in zip(train, sequences):
-        bad = next((n for n in periodic_steps(tokens) if n >= 96), None)
+        bad = onset(tokens, args.detector)
         if bad is None:
             continue
         earlier = max(24, bad - min(128, bad // 2))
@@ -138,6 +161,11 @@ def run(args):
     root = args.root
     queue.save(root / 'calibration.json', {'train_sample': [row['id'] for row in train],
                                            'loop_pair_ids': train_rows, 'token_cap': args.tokens,
+                                           'detector': args.detector,
+                                           'periodic_cases': sum(onset(tokens, 'periodic') is not None
+                                                                 for _, tokens in sequences),
+                                           'recurrent_16gram_cases': sum(onset(tokens, 'recurrent') is not None
+                                                                        for _, tokens in sequences),
                                            'model_revision': manifest['model_revision'],
                                            'train_outcomes': score(tokenizer, train, [t for _, t in sequences],
                                                                    args.tokens)})
@@ -263,7 +291,8 @@ def main():
     parser.add_argument('--uuid', required=True)
     parser.add_argument('--deadline', type=int, required=True)
     parser.add_argument('--seed', type=int, default=41)
-    parser.add_argument('--shard', type=int, choices=(0, 1, 2), default=0)
+    parser.add_argument('--shard', type=int, choices=(0, 1, 2, 3), default=0)
+    parser.add_argument('--detector', choices=('periodic', 'recurrent'), default='periodic')
     parser.add_argument('--tokens', type=int, default=4096)
     parser.add_argument('--train', type=int, default=24)
     parser.add_argument('--test', type=int, default=48)
@@ -296,7 +325,7 @@ def main():
         queue.save(args.root / 'schedule.json', {'pid': child.pid, 'gpu': args.gpu,
                                                    'uuid': args.uuid, 'deadline': args.deadline,
                                                    'after': str(args.after), 'seed': args.seed,
-                                                   'shard': args.shard})
+                                                   'shard': args.shard, 'detector': args.detector})
         print(json.dumps({'pid': child.pid, 'status': 'scheduled', 'root': str(args.root)}))
 
 

@@ -114,11 +114,16 @@ def collect_natural(roots):
             calibration = load(calibration_path)
             record['loop_pairs'] = len(calibration['loop_pair_ids'])
             record['token_cap'] = calibration['token_cap']
+            for key in ('detector', 'periodic_cases', 'recurrent_16gram_cases'):
+                if key in calibration:
+                    record[key] = calibration[key]
         for arm in ('original', 'sparse_projection', 'function_fit'):
             path = root / (arm + '.json')
             if path.is_file():
                 scores = load(path)['per_problem']
-                fields = ('correct', 'ended_thinking', 'hit_cap', 'length', 'repeat_steps')
+                fields = ['correct', 'ended_thinking', 'hit_cap', 'length', 'repeat_steps']
+                if scores and 'recurrent_16gram_steps' in scores[0]:
+                    fields.append('recurrent_16gram_steps')
                 record['arm_scores'][arm] = {'count': len(scores), **{
                     field: statistics.mean(row[field] for row in scores) for field in fields}}
         result[root.name] = record
