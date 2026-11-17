@@ -82,6 +82,12 @@ ablation of mask ranking (activation energy or variance) and ridge
 regularization. It records independent output roots, reuses the parent plan's
 frozen selection and deadline, and verifies the local GPU UUIDs before launch.
 
+`functional_campaign.py` launches the compression, repetition, or control
+queue on explicitly assigned GPUs under a shared deadline. It pins the original
+data and checkpoint hashes, and each job fits physical weight patches from
+finite difference responses. `summarize_functional.py` audits the completed
+job receipts and reports paired outcomes by condition.
+
 The earlier one-GPU campaign completed all 82 planned conditions in about
 3 hours 15 minutes with zero failed jobs. Its recovered metric summary is
 available in `night6h_result_summary.json`.

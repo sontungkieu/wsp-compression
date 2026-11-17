@@ -102,6 +102,9 @@ def worker(root, lane):
             if remaining < 120: raise TimeoutError('campaign deadline reached')
             if sha(__file__) != plan['queue_sha256'] or sha(cfg['source']) != plan['source_sha256']:
                 raise RuntimeError('code hash changed')
+            for path, expected in plan.get('aux_sha256', {}).items():
+                if sha(path) != expected:
+                    raise RuntimeError('dependent source hash changed')
             for path, expected in plan['data_sha256'].items():
                 if sha(path) != expected: raise RuntimeError('data hash changed')
             d = device(gpu, settings['uuid'])

@@ -91,6 +91,16 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(model_path, local_files_only=True, torch_dtype=dtype).to(device).eval()
     if model.config.model_type != 'qwen2':
         raise SystemExit('only verified qwen2 architecture supported')
+    functional = cfg.get('functional')
+    if functional and functional['task'] == 'repeat':
+        from wsp_functional import run_repetition
+        result = run_repetition(model, tokenizer, cfg, digest(__file__))
+        result['runtime'] = {'torch': torch.__version__, 'transformers': transformers.__version__,
+                             'gpu': torch.cuda.get_device_name(0), 'dtype': str(dtype),
+                             'peak_allocated_bytes': torch.cuda.max_memory_allocated()}
+        with output.open('x') as f:
+            json.dump(result, f, indent=2)
+        return
     layers = model.model.layers
     originals = [(l.mlp.gate_proj, l.mlp.up_proj, l.mlp.down_proj) for l in layers]
     dense_parameters = sum(p.numel() for p in model.parameters())
@@ -224,6 +234,11 @@ def main():
             layer.mlp.gate_proj = linear_slice(gate, rows=keep)
             layer.mlp.up_proj = linear_slice(up, rows=keep)
             layer.mlp.down_proj = linear_slice(down, cols=keep, delta=delta, bias_override=bias)
+
+    functional_metrics = None
+    if functional:
+        from wsp_functional import prepare_compression
+        functional_metrics = prepare_compression(model, install, choices, windows, cfg)
 
     def nll_record(ids, target_start=1):
         xx = torch.tensor(ids, device=device)[None]
@@ -372,6 +387,8 @@ def main():
                            'timings_are_serving_benchmarks': False},
               'inputs': {'train_sha256': digest(train_path), 'dataset_manifest_sha256': digest(data_dir/'manifest.json')},
               'wall_seconds': time.monotonic()-started}
+    if functional_metrics is not None:
+        result['functional'] = functional_metrics
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open('x') as f:
         json.dump(result, f, indent=2)
