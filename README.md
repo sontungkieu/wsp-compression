@@ -94,6 +94,20 @@ and GSM8K assets via the configured HTTPS proxy. `natural_loop.py` uses a
 separate train shard to locate natural loops and scores held-out math examples
 after applying sparse projection or fitted patches.
 
+`loop_gradient.py` compares one-token and sampled trajectory gradients for
+selecting columns to attenuate. It evaluates the original weights, both
+gradient selections and a layer-matched random selection at a common edit
+norm. Its paired held-out rollouts record recurrence, output length, clean
+next-token KL and a prompt-based copying probe. The WikiText motif cases are
+controlled synthetic continuations.
+
+`gradient_campaign.py` runs those comparisons independently on each assigned
+GPU. A lane can wait for an explicit predecessor status file. Optional
+offload mode checks the assigned UUIDs twice before admission, uses a
+30-minute polling cadence and yields if another process appears on that GPU.
+The watcher and each lane record absolute deadlines and write status JSON to
+a fresh run directory. Both scripts support `--help`.
+
 The earlier one-GPU campaign completed all 82 planned conditions in about
 3 hours 15 minutes with zero failed jobs. Its recovered metric summary is
 available in `night6h_result_summary.json`.
