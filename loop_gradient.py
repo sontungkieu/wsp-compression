@@ -28,6 +28,38 @@ def examples(ids, start, count, period, rng, copy_instruction):
     return [[rows[i] for i in order] for rows in (clean, positive, copy, motifs)]
 
 
+def rollout_tokens(model, rows, steps, seed, *, batch_size, ends, pad, sample=True, temp=.8):
+    torch.manual_seed(seed)
+    config = GenerationConfig(
+        max_new_tokens=steps, do_sample=sample, temperature=temp if sample else 1.,
+        top_k=0 if sample else None, top_p=1., eos_token_id=ends,
+        pad_token_id=pad, use_cache=True,
+    )
+    pieces = []
+    with torch.inference_mode():
+        for i in range(0, len(rows), batch_size):
+            xs = torch.tensor(rows[i:i + batch_size], device=model.device, dtype=torch.long)
+            ys = model.generate(xs, attention_mask=torch.ones_like(xs), generation_config=config)
+            suffix = ys[:, xs.size(1):].tolist()
+            pieces.extend([row + [ends[0]] * (steps - len(row)) for row in suffix])
+    return pieces
+
+
+def score_rollout(outputs, motifs, ends):
+    results = []
+    for suffix, motif in zip(outputs, motifs):
+        length = next((i + 1 for i, token in enumerate(suffix) if token in ends), len(suffix))
+        seq, period = suffix[:length], len(motif)
+        # Fixed loss denominator keeps the reward defined for stopped rollouts.
+        matches = sum(t == motif[i % period] for i, t in enumerate(seq))
+        repeats = sum(seq[i - 2 * period:i - period] == seq[i - period:i]
+                      and seq[i] == seq[i - period] for i in range(2 * period, length))
+        results.append({'aligned': matches / len(suffix), 'recurrence': repeats / len(suffix),
+                        'motif_completed': seq[:period] == motif,
+                        'length': length, 'stopped': seq[-1] in ends})
+    return results
+
+
 def run(args):
     if torch.cuda.device_count() != 1:
         raise SystemExit('requires exactly one assigned CUDA device')
@@ -63,35 +95,12 @@ def run(args):
         return model.lm_head(hidden[:, positions]).float()
 
     def generate(rows, steps, seed, sample=True):
-        torch.manual_seed(seed)
-        config = GenerationConfig(
-            max_new_tokens=steps, do_sample=sample, temperature=temp if sample else 1.,
-            top_k=0 if sample else None, top_p=1., eos_token_id=ends,
-            pad_token_id=tokenizer.pad_token_id if tokenizer.pad_token_id is not None else ends[0],
-            use_cache=True,
-        )
-        with torch.inference_mode():
-            pieces = []
-            for i in range(0, len(rows), args.batch):
-                xs = array(rows[i:i + args.batch])
-                ys = model.generate(xs, attention_mask=torch.ones_like(xs), generation_config=config)
-                suffix = ys[:, xs.size(1):].tolist()
-                pieces.extend([row + [ends[0]] * (steps - len(row)) for row in suffix])
-            return pieces
+        pad = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else ends[0]
+        return rollout_tokens(model, rows, steps, seed, batch_size=args.batch, ends=ends,
+                              pad=pad, sample=sample, temp=temp)
 
     def rewards(outputs, motifs):
-        results = []
-        for suffix, motif in zip(outputs, motifs):
-            length = next((i + 1 for i, token in enumerate(suffix) if token in ends), len(suffix))
-            seq, period = suffix[:length], len(motif)
-            # Fixed loss denominator keeps the reward defined for stopped rollouts.
-            matches = sum(t == motif[i % period] for i, t in enumerate(seq))
-            repeats = sum(seq[i - 2 * period:i - period] == seq[i - period:i]
-                          and seq[i] == seq[i - period] for i in range(2 * period, length))
-            results.append({'aligned': matches / len(suffix), 'recurrence': repeats / len(suffix),
-                            'motif_completed': seq[:period] == motif,
-                            'length': length, 'stopped': seq[-1] in ends})
-        return results
+        return score_rollout(outputs, motifs, ends)
 
     def score(kind, suffixes=None, centered=None):
         gates = [torch.ones(size, device=device, requires_grad=True) for size in sizes]

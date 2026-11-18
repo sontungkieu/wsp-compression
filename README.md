@@ -108,6 +108,38 @@ offload mode checks the assigned UUIDs twice before admission, uses a
 The watcher and each lane record absolute deadlines and write status JSON to
 a fresh run directory. Both scripts support `--help`.
 
+### Fixed-budget Deletion Tuning
+
+`loop_deletion.py` compares static binary mask learning, three random masks,
+and an Astra-style MLP output projection on Qwen2.5-0.5B and 1.5B. The base
+arm preserves the checkpoint as the reference. Calibration uses synthetic
+WikiText motif prefixes. Test prefixes come from a separate file.
+
+- Use the same number of changed BF16 scalars per layer for every edited arm.
+  The resulting Astra-style projection sets that budget for each condition.
+  Track the realized Frobenius norm for each arm.
+- Train binary mask scores with a fixed top-k forward mask and a sigmoid
+  gradient. The loss discourages up to four consecutive motif tokens, with
+  a reference KL term on clean and explicit-copy prompts. Learned and random
+  masks share the same uniformly sampled pool of nonzero weights.
+- Start in `gate_proj`, following the layer family in [Deletion Tuning](https://arxiv.org/html/2611.10866#S4).
+  Repeat in `down_proj` to compare deletion and projection in the same matrix
+  family. The original paper trains smoothly annealed gates with task losses.
+- Evaluate free greedy and sampled rollouts. Save recurrence, motif
+  continuation, output length, stop rate, clean KL and exact copy. Report
+  paired prompt-bootstrap intervals against the base, Astra-style projection,
+  and mean of the random masks. Evidence from these probes is scoped to
+  controlled repetition on the benchmark.
+
+Run one condition with `CUDA_VISIBLE_DEVICES` set to its assigned GPU and
+`python3 -B loop_deletion.py --model MODEL --train TRAIN --test TEST --output RESULT`.
+For a deadline-bounded GPU allocation, use `gradient_campaign.py --experiment deletion`
+with `--payload-sha` for `loop_deletion.py` and one `--support-sha FILE=SHA256`
+argument each for `loop_gradient.py`, `six_gpu_campaign.py`, and `wsp_functional.py`.
+The queue begins with a small canary, followed by gate and down-projection
+conditions at two budgets and three motif lengths. Use the host, GPU UUID,
+available time, and immutable parent plan from the active allocation.
+
 The earlier one-GPU campaign completed all 82 planned conditions in about
 3 hours 15 minutes with zero failed jobs. Its recovered metric summary is
 available in `night6h_result_summary.json`.

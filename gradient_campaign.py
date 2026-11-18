@@ -91,6 +91,20 @@ def jobs(slot, offload):
                    columns=cols, strength=strength)
 
 
+def deletion_jobs(slot):
+    """Run the gate comparison first, then repeat it in Astra's matrix family."""
+    models = ('q05', 'q15') if slot % 2 == 0 else ('q15', 'q05')
+    yield dict(model=models[0], period=8, columns=8, rows=8, test_rows=12,
+               steps=6, random_draws=2, eval_draws=1, mask_module='gate_proj')
+    for module, period, columns, model in itertools.product(
+            ('gate_proj', 'down_proj'), (8, 4, 12), (16, 64), models):
+        yield dict(model=model, period=period, columns=columns, rows=64, test_rows=40,
+                   steps=48, mask_module=module)
+
+
+DELETION_SUPPORT = ('loop_gradient.py', 'six_gpu_campaign.py', 'wsp_functional.py')
+
+
 def worker(args, assignment):
     index, uuid, _ = assignment
     root = args.root / f'gpu{index}'
@@ -105,7 +119,10 @@ def worker(args, assignment):
     for path in data.values():
         if digest(path) != parent['data_sha256'][path]:
             raise RuntimeError('data hash differs from parent')
-    payload = Path(__file__).with_name('loop_gradient.py')
+    deletion = args.experiment == 'deletion'
+    payload = Path(__file__).with_name('loop_deletion.py' if deletion else 'loop_gradient.py')
+    sources = {payload: args.payload_sha,
+               **{payload.with_name(name): expected for name, expected in args.support_sha.items()}}
     verified_models, failures = set(), {}
     env = dict(os.environ, CUDA_DEVICE_ORDER='PCI_BUS_ID', CUDA_VISIBLE_DEVICES=str(index),
                HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1', TOKENIZERS_PARALLELISM='false',
@@ -123,15 +140,17 @@ def worker(args, assignment):
     signal.signal(signal.SIGTERM, on_stop)
     signal.signal(signal.SIGINT, on_stop)
     try:
-        for number, job in enumerate(jobs(args.slot + index, args.offload)):
+        batch = deletion_jobs(args.slot + index) if deletion else jobs(args.slot + index, args.offload)
+        for number, job in enumerate(batch):
             if time.time() >= args.until - 120:
                 state['status'] = 'deadline'
                 break
             if not await_idle(assignment, args.until):
                 state['status'] = 'device_became_busy'
                 break
-            if digest(payload) != args.payload_sha:
-                raise RuntimeError('payload hash changed')
+            for path, expected in sources.items():
+                if digest(path) != expected:
+                    raise RuntimeError(f'source hash changed: {path.name}')
             model = config['models'][job['model']]
             if failures.get(model, 0) >= 2:
                 continue
@@ -143,20 +162,25 @@ def worker(args, assignment):
             if not await_idle(assignment, args.until):
                 state['status'] = 'device_became_busy'
                 break
-            folder = root / f'{number:03d}-{job["model"]}-p{job["period"]}-{job["objective"]}'
+            label = job['mask_module'] if deletion else job['objective']
+            folder = root / f'{number:03d}-{job["model"]}-p{job["period"]}-{label}'
             folder.mkdir()
             output = folder / 'result.json'
+            # The two 12-condition deletion panels share calibration and holdout draws.
+            case = (number - 1) % 12 + 1 if deletion and number else number
             settings = {**job, 'model': model, 'train': data['train.txt'], 'test': data['test.txt'],
-                        'seed': 13201 + args.slot * 10000 + index * 1200 + number,
-                        'offset': 4096 + ((args.slot * 3071 + index * 8191 + number * 5381) % 80000),
-                        'test_offset': (args.slot * 313 + index * 2048 + number * 4201) % 36000,
+                        'seed': 13201 + args.slot * 10000 + index * 1200 + case,
+                        'offset': 4096 + ((args.slot * 3071 + index * 8191 + case * 5381) % 80000),
+                        'test_offset': (args.slot * 313 + index * 2048 + case * 4201) % 36000,
                         'eval_horizon': 48, 'output': str(output),
-                        'batch': 4 if job['model'] == 'q7i' else 8,
-                        'grad_batch': 2 if job['model'] == 'q7i' else 4}
+                        'batch': 4 if job['model'] == 'q7i' else 8}
+            if not deletion:
+                settings['grad_batch'] = 2 if job['model'] == 'q7i' else 4
             argv = [sys.executable, '-B', str(payload)]
             for k, v in settings.items():
                 argv += ['--' + k.replace('_', '-'), str(v)]
-            entry = {'folder': str(folder), 'settings': settings, 'status': 'running', 'started': time.time()}
+            entry = {'folder': str(folder), 'settings': settings, 'status': 'running',
+                     'started': time.time(), 'canary': deletion and number == 0}
             state['jobs'].append(entry)
             with (folder / 'stdout.log').open('x') as log:
                 active = subprocess.Popen(argv, env=env, stdout=log, stderr=subprocess.STDOUT,
@@ -186,8 +210,8 @@ def worker(args, assignment):
             entry.update(exit_code=code, finished=time.time())
             if code == 0 and output.is_file():
                 result = json.loads(output.read_text())
-                entry.update(status='completed', sha256=digest(output),
-                             eligible=result['centered_risk_sd'] > 0.)
+                eligible = result['eligible'] if deletion else result['centered_risk_sd'] > 0.
+                entry.update(status='completed', sha256=digest(output), eligible=eligible)
             else:
                 entry['status'] = 'failed'
                 failures[model] = failures.get(model, 0) + 1
@@ -215,7 +239,8 @@ def worker(args, assignment):
 
 def watch(args):
     plan = {'host': args.host, 'pid': os.getpid(), 'available_from': args.start, 'until': args.until,
-            'assignments': args.assign, 'offload': args.offload, 'payload_sha256': args.payload_sha,
+            'assignments': args.assign, 'offload': args.offload, 'experiment': args.experiment,
+            'payload_sha256': args.payload_sha, 'support_sha256': args.support_sha,
             'launcher_sha256': digest(__file__), 'parent_sha256': digest(args.parent),
             'poll_seconds': 1800 if args.offload else 20, 'launched': {}, 'polls': []}
     progress = args.root / 'watcher.json'
@@ -261,6 +286,8 @@ def main():
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--parent', type=Path, required=True)
     parser.add_argument('--payload-sha', required=True)
+    parser.add_argument('--experiment', choices=('gradient', 'deletion'), default='gradient')
+    parser.add_argument('--support-sha', action='append', default=[], metavar='FILE=SHA256')
     parser.add_argument('--assign', action='append', required=True, help='index,uuid,predecessor status path')
     parser.add_argument('--start', type=int, required=True)
     parser.add_argument('--until', type=int, required=True)
@@ -270,9 +297,18 @@ def main():
     parser.add_argument('--worker', type=int)
     parser.add_argument('--worker-until', type=int)
     args = parser.parse_args()
+    if any('=' not in entry for entry in args.support_sha):
+        parser.error('--support-sha expects FILE=SHA256')
+    supports = dict(entry.split('=', 1) for entry in args.support_sha)
+    required = set(DELETION_SUPPORT if args.experiment == 'deletion' else ())
+    if set(supports) != required or len(supports) != len(args.support_sha):
+        parser.error(f'expected support hashes for {sorted(required)}')
+    args.support_sha = supports
     args.assign = [(int(i), u, p) for i, u, p in (a.split(',', 2) for a in args.assign)]
     if socket.gethostname() != args.host or len({x[0] for x in args.assign}) != len(args.assign):
         parser.error('unexpected host or duplicate GPU assignment')
+    if args.start >= args.until or (not args.watch and args.worker is None and args.until <= time.time() + 180):
+        parser.error('a live allocation with at least three minutes remaining is required')
     if args.offload and args.until - args.start > 14400:
         parser.error('offload window exceeds four hours')
     if args.worker is not None:
@@ -281,6 +317,12 @@ def main():
     elif args.watch:
         watch(args)
     else:
+        if args.experiment == 'deletion':
+            payload = Path(__file__).with_name('loop_deletion.py')
+            expected_sources = {payload: args.payload_sha,
+                                **{payload.with_name(name): expected for name, expected in supports.items()}}
+            if any(not path.is_file() or digest(path) != expected for path, expected in expected_sources.items()):
+                parser.error('deletion source snapshot is incomplete or differs from the pinned hashes')
         args.root.mkdir()
         with (args.root / 'watcher.log').open('x') as log:
             child = subprocess.Popen([sys.executable, '-B', str(Path(__file__).resolve()), *sys.argv[1:], '--watch'],
