@@ -2,6 +2,7 @@
 import argparse
 from collections import Counter, deque
 import hashlib
+import inspect
 import json
 from pathlib import Path
 import random
@@ -9,8 +10,13 @@ import re
 import statistics
 import time
 
-CAPS = (512, 1024, 2048)
-POLICIES = ('greedy', 'sample')
+CAPS = (512, 1024, 2048, 4096, 8192, 16384)
+POLICIES = {
+    'greedy': (False, 1., 1., 50, 0.),
+    'sample': (True, .7, .9, 0, 0.),
+    'astra': (True, .6, .95, 20, 1.5),
+}
+ASTRA_MATH = r"Please reason step by step, and put your final answer within oxed{}."
 VERIFIER_VERSION = 1
 DECIMAL = re.compile(r'[-+]?\d+(?:,\d{3})*(?:\.\d+)?')
 INTEGER_LIST = re.compile(r'\d+(?:\s*,\s*\d+)*')
@@ -50,7 +56,7 @@ def first_recurrent(tokens, ngram=16):
     return None
 
 
-def panel(data, count, shard):
+def panel(data, count, shard, astra_math=False):
     import pyarrow.parquet as pq
 
     source = pq.read_table(data).to_pylist()
@@ -60,11 +66,15 @@ def panel(data, count, shard):
     if count > 32 or start + count > len(indices):
         raise ValueError('GSM8K panel outside held-out shard')
     rows = []
+    instruction = ASTRA_MATH if astra_math else 'Solve the problem. End with a line Final: followed by the numerical answer.'
     for index in indices[start:start + count]:
         row = source[index]
         rows.append({'id': f'gsm8k:{index}', 'task': 'math',
-                     'prompt': row['question'] + '\nSolve the problem. End with a line Final: followed by the numerical answer.',
+                     'prompt': row['question'] + '\n' + instruction,
+                     'boxed_answer_required': astra_math,
                      'gold': row['answer'].rsplit('####', 1)[-1].strip().replace(',', '')})
+    if astra_math:
+        return rows
     rng = random.Random(923311 + shard)
     for i in range(min(count, 24)):
         start_n, divisor = rng.randrange(11, 57), rng.randrange(2, 6)
@@ -96,7 +106,11 @@ def assess(row, text, tokens, eos, cap, pending_thought=False):
     if task == 'math':
         matches = FINAL.findall(answer)
         boxed = re.findall(r'\\boxed\{([^{}]+)\}', answer)
-        answer = (matches[-1] if matches else boxed[-1] if boxed else answer).strip(' .')
+        if row.get('boxed_answer_required'):
+            answer = boxed[-1] if boxed else ''
+        else:
+            answer = matches[-1] if matches else boxed[-1] if boxed else answer
+        answer = answer.strip(' .')
         answer_found = bool(DECIMAL.fullmatch(answer))
         correct = answer_found and float(answer.replace(',', '')) == float(row['gold'])
     elif task == 'enumeration':
@@ -177,7 +191,7 @@ def summarize(path):
 def run(args):
     import torch
     import transformers
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers import AutoModelForCausalLM, AutoModelForImageTextToText, AutoTokenizer, LogitsProcessor
 
     if torch.cuda.device_count() != 1:
         raise RuntimeError('exactly one assigned CUDA device required')
@@ -186,9 +200,34 @@ def run(args):
     if data_sha != manifest['artifacts'][args.data.name]['sha256']:
         raise ValueError('GSM8K digest mismatch')
     start = time.monotonic()
-    rows = panel(args.data, args.count, args.shard)
-    model = AutoModelForCausalLM.from_pretrained(
+    rows = panel(args.data, args.count, args.shard, args.astra_math)
+    model_type = json.loads((args.model / 'config.json').read_text())['model_type']
+    pinned = {}
+    loader = AutoModelForCausalLM
+    if model_type == 'qwen3_5':
+        loader = AutoModelForImageTextToText
+        for name, receipt in manifest['artifacts'].items():
+            relative = Path(name)
+            if relative.parts[0] == 'model':
+                actual = sha(args.model / relative.name)
+                if actual != receipt['sha256']:
+                    raise ValueError('pinned model digest mismatch: ' + relative.name)
+                pinned[relative.name] = actual
+        if not any(name.endswith('.safetensors') for name in pinned):
+            raise ValueError('no pinned checkpoint weights')
+    model = loader.from_pretrained(
         args.model, local_files_only=True, dtype=torch.bfloat16).to('cuda:0').eval()
+    defaults_arg = {'use_model_defaults': False} if 'use_model_defaults' in inspect.signature(model.generate).parameters else {}
+
+    class PresencePenalty(LogitsProcessor):
+        def __init__(self, input_width, amount):
+            self.input_width = input_width
+            self.amount = amount
+
+        def __call__(self, input_ids, scores):
+            seen = torch.zeros_like(scores, dtype=torch.bool)
+            seen.scatter_(1, input_ids[:, self.input_width:], True)
+            return scores - self.amount * seen
     tokenizer = AutoTokenizer.from_pretrained(args.model, local_files_only=True)
     tokenizer.padding_side = 'left'
     eos = model.generation_config.eos_token_id
@@ -204,8 +243,8 @@ def run(args):
                             p.suffix == '.safetensors'):
             stat = p.stat()
             artifacts[p.name] = {'bytes': stat.st_size, 'mtime_ns': stat.st_mtime_ns}
-            if p.suffix != '.safetensors':
-                artifacts[p.name]['sha256'] = sha(p)
+            if p.name in pinned or p.suffix != '.safetensors':
+                artifacts[p.name]['sha256'] = pinned[p.name] if p.name in pinned else sha(p)
     app = {'record': 'manifest', 'artifact_root': str(args.model.resolve()),
            'artifacts': artifacts, 'source_sha': sha(Path(__file__)), 'seed': args.seed,
            'data_revision': manifest['gsm8k_revision'], 'data_sha': data_sha,
@@ -214,17 +253,21 @@ def run(args):
            'panel': rows, 'eos_ids': sorted(stop_ids), 'batch': args.batch,
            'modes': args.mode, 'decoders': args.decoder, 'cap': args.cap,
            'data': str(args.data), 'shard': args.shard, 'sample_seeds': args.sample_seeds,
-           'sample_temperature': .7, 'sample_top_p': .9, 'use_model_defaults': False}
+           'sample_temperature': .7, 'sample_top_p': .9, 'use_model_defaults': False,
+           'model_revision': manifest['model_revision'] if pinned else None,
+           'astra_math_prompt': args.astra_math,
+           'decoder_settings': {name: dict(zip(('sample', 'temperature', 'top_p', 'top_k', 'presence_penalty'),
+                                               POLICIES[name], strict=True)) for name in args.decoder}}
     with args.output.open('x', buffering=1) as log, torch.inference_mode():
         print(json.dumps(app), file=log)
         print('loaded', args.model.name, args.mode, len(rows), 'max_tokens', args.cap, flush=True)
         for mode in args.mode:
             for decoder in args.decoder:
-                do_sample = decoder == 'sample'
+                do_sample, temperature, top_p, top_k, presence = POLICIES[decoder]
                 config = transformers.GenerationConfig(
                     max_new_tokens=args.cap, do_sample=do_sample, eos_token_id=sorted(stop_ids),
-                    pad_token_id=tokenizer.pad_token_id, temperature=.7 if do_sample else 1.,
-                    top_p=.9 if do_sample else 1., top_k=0 if do_sample else 50,
+                    pad_token_id=tokenizer.pad_token_id, temperature=temperature,
+                    top_p=top_p, top_k=top_k,
                     repetition_penalty=1., use_cache=True)
                 for draw in range(args.sample_seeds if do_sample else 1):
                     for begin in range(0, len(rows), args.batch):
@@ -235,7 +278,9 @@ def run(args):
                         prompts = [render(tokenizer, row, mode) for row in batch_rows]
                         inp = tokenizer(prompts, add_special_tokens=False, padding=True,
                                         return_tensors='pt').to('cuda:0')
-                        snippets = model.generate(**inp, generation_config=config, use_model_defaults=False)
+                        processors = [PresencePenalty(inp.input_ids.shape[1], presence)] if presence else None
+                        snippets = model.generate(**inp, generation_config=config,
+                                                  logits_processor=processors, **defaults_arg)
                         for row, prompt, output in zip(batch_rows, prompts,
                                                        snippets[:, inp.input_ids.shape[1]:], strict=True):
                             tokens = output.tolist()
@@ -279,6 +324,8 @@ def self_test():
     assert not assess(math, '<think>\nFinal: 12', [1], False, 5)['correct']
     assert not assess(math, 'Final: 12', [1], False, 5, pending_thought=True)['correct']
     assert assess(math, '4</think>Final: 12', [1], True, 5, pending_thought=True)['correct']
+    assert assess({**math, 'boxed_answer_required': True}, r'</think>\boxed{12}', [1], True, 5)['correct']
+    assert not assess({**math, 'boxed_answer_required': True}, 'Final: 12', [1], True, 5)['correct']
     assert not assess(math, 'Final: 11', [1], True, 5)['correct']
     from tempfile import TemporaryDirectory
 
@@ -302,6 +349,7 @@ def main():
     parser.add_argument('--deadline', type=int)
     parser.add_argument('--mode', choices=('base', 'chat', 'think', 'no-think'), action='append')
     parser.add_argument('--decoder', choices=POLICIES, action='append')
+    parser.add_argument('--astra-math', action='store_true', help='use the released boxed-answer prompt on GSM8K only')
     parser.add_argument('--seed', type=int, default=1944)
     parser.add_argument('--sample-seeds', type=int, default=1)
     parser.add_argument('--shard', type=int, default=0)
@@ -318,7 +366,7 @@ def main():
             parser.error('model, data, output, deadline and mode are required')
         if min(args.count, args.batch, args.cap, args.sample_seeds) <= 0 or args.shard < 0:
             parser.error('invalid panel or generation settings')
-        args.decoder = args.decoder or list(POLICIES)
+        args.decoder = args.decoder or ['greedy', 'sample']
         run(args)
 
 

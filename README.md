@@ -174,6 +174,20 @@ continuation can select lanes with `--gpu` and wait for a named baseline run
 with `--after-baseline`. Both commands support `--help`. The queue measures checkpoint and decoder comparisons before any
 causal interpretation or targeted weight edit.
 
+The pinned Qwen3.5-0.8B checkpoint supports `--astra-math --mode think
+--decoder astra` with Transformers 5.3.0 and the staged model and GSM8K
+manifest. This uses the released boxed-answer prompt and sampling settings
+in a Transformers text-only evaluation with exact numeric scoring. The
+baseline saves nested cap outcomes and verifies the checkpoint hashes.
+
+`repetition_replay.py` selects exact terminal cycles from completed Llama
+GSM8K runs after validating their digests and the pinned panel. It keeps
+the original token prefix, compares greedy and nucleus sampling, and
+compares a verified intermediate calculation with a token-length-matched
+placebo. `--inventory` is a CPU-only check for the case gate, and
+`--summarize` reports prompt-weighted continuation metrics from the raw
+JSONL. Both scripts support `--self-test`.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
