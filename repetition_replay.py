@@ -30,12 +30,17 @@ FRAME_FILLERS = {'spaces': ' ', 'newlines': '\n', 'periods': '.'}
 FRAME_ARMS = {f'{frame}_{name}': {'frame': frame == 'framed', 'filler': filler}
               for frame in ('bare', 'framed') for name, filler in FRAME_FILLERS.items()}
 FRAME_COMPONENTS = ('words', 'brackets', 'edges')
-COMPONENT_ARMS = {
-    '_'.join(name for name, present in zip(FRAME_COMPONENTS, flags) if present) or 'none':
-    dict(zip(FRAME_COMPONENTS, flags))
-    for flags in product((False, True), repeat=len(FRAME_COMPONENTS))
-}
+PUNCTUATION_COMPONENTS = ('opener', 'closer', 'slash')
 REPLAY_SEED = 28937
+
+
+def factorial_arms(parts):
+    return {'_'.join(name for name, present in zip(parts, flags) if present) or 'none':
+            dict(zip(parts, flags)) for flags in product((False, True), repeat=len(parts))}
+
+
+COMPONENT_ARMS = factorial_arms(FRAME_COMPONENTS)
+PUNCTUATION_ARMS = factorial_arms(PUNCTUATION_COMPONENTS)
 
 
 def terminal_cycle(tokens):
@@ -188,13 +193,19 @@ def component_tags(*, words, brackets, edges):
     return opening, closing
 
 
-def with_component_ablation(tokenizer, prefix, inserted_tokens):
+def punctuation_tags(*, opener, closer, slash):
+    opening = '[]' if opener else ''
+    mark = '/' if slash else ''
+    closing = f'[{mark}]' if closer else mark
+    return '\n\n' + opening + '\n', '\n' + closing + '\n'
+
+
+def with_newline_tags(tokenizer, prefix, inserted_tokens, tags):
     newline = tokenizer.encode('\n', add_special_tokens=False)
     if len(newline) != 1:
-        raise ValueError('component ablation requires a single newline token')
+        raise ValueError('tag ablation requires a single newline token')
     result = {}
-    for arm, components in COMPONENT_ARMS.items():
-        opening, closing = component_tags(**components)
+    for arm, (opening, closing) in tags.items():
         start = tokenizer.encode(opening, add_special_tokens=False) if opening else []
         end = tokenizer.encode(closing, add_special_tokens=False) if closing else []
         body = inserted_tokens - len(start) - len(end)
@@ -202,6 +213,16 @@ def with_component_ablation(tokenizer, prefix, inserted_tokens):
             raise ValueError('component tags exceed the parent insertion budget')
         result[arm] = prefix + start + newline * body + end
     return result
+
+
+def with_component_ablation(tokenizer, prefix, inserted_tokens):
+    tags = {arm: component_tags(**flags) for arm, flags in COMPONENT_ARMS.items()}
+    return with_newline_tags(tokenizer, prefix, inserted_tokens, tags)
+
+
+def with_punctuation_ablation(tokenizer, prefix, inserted_tokens):
+    tags = {arm: punctuation_tags(**flags) for arm, flags in PUNCTUATION_ARMS.items()}
+    return with_newline_tags(tokenizer, prefix, inserted_tokens, tags)
 
 
 def run(args, identity, selected, verified):
@@ -243,6 +264,7 @@ def run(args, identity, selected, verified):
         'instructions': (NOTE_TEXT, with_matched_notes),
         'frame': (FRAME_ARMS, with_frame_ablation),
         'components': (COMPONENT_ARMS, with_component_ablation),
+        'punctuation': (PUNCTUATION_ARMS, with_punctuation_ablation),
     }[args.ablation_design]
     parent_cases = {}
     if ablation:
@@ -371,17 +393,21 @@ def ablation_contrasts(design):
         return {f'{a}_minus_{b}': {a: 1, b: -1} for a, b in (
             ('continue', 'neutral'), ('finalize', 'neutral'), ('finalize', 'continue'))}
 
-    if design == 'components':
+    if design in ('components', 'punctuation'):
+        parts, design_arms = ((FRAME_COMPONENTS, COMPONENT_ARMS) if design == 'components'
+                              else (PUNCTUATION_COMPONENTS, PUNCTUATION_ARMS))
         factorial = {}
-        for order in range(1, len(FRAME_COMPONENTS) + 1):
-            denominator = 2 ** (len(FRAME_COMPONENTS) - order)
-            for terms in combinations(FRAME_COMPONENTS, order):
+        for order in range(1, len(parts) + 1):
+            denominator = 2 ** (len(parts) - order)
+            for terms in combinations(parts, order):
                 factorial['_by_'.join(terms)] = {
                     arm: (-1) ** sum(not flags[t] for t in terms) / denominator
-                    for arm, flags in COMPONENT_ARMS.items()}
-        full = '_'.join(FRAME_COMPONENTS)
-        drops = {f'full_minus_no_{part}': {full: 1, '_'.join(n for n in FRAME_COMPONENTS if n != part): -1}
-                 for part in FRAME_COMPONENTS}
+                    for arm, flags in design_arms.items()}
+        full = '_'.join(parts)
+        drops = {f'full_minus_no_{part}': {full: 1, '_'.join(n for n in parts if n != part): -1}
+                 for part in parts}
+        if design == 'punctuation':
+            drops['slash_only_minus_none'] = {'slash': 1, 'none': -1}
         return {**factorial, **drops}
 
     frame_effects = {f'frame_effect_{f}': {f'framed_{f}': 1, f'bare_{f}': -1} for f in FRAME_FILLERS}
@@ -482,7 +508,8 @@ def main():
     parser.add_argument('--inventory', action='store_true')
     parser.add_argument('--self-test', action='store_true')
     parser.add_argument('--ablate-note', type=Path, help='match the cohort and inserted token count of a completed Astra replay directory')
-    parser.add_argument('--ablation-design', choices=('instructions', 'frame', 'components'), default='instructions')
+    parser.add_argument('--ablation-design', choices=('instructions', 'frame', 'components', 'punctuation'),
+                        default='instructions')
     args = parser.parse_args()
     if args.self_test:
         assert terminal_cycle(list(range(7)) * 20) == (7, 35)
@@ -491,6 +518,7 @@ def main():
         assert select_information('We found <<12*3=36>> and <<36-10=26>>. #### 26', '26') == '12*3 = 36'
         assert select_information('We found <<36-10=26>>. #### 26', '26') is None
         assert component_tags(words=True, brackets=True, edges=True) == (CONTEXT_OPEN, CONTEXT_CLOSE)
+        assert punctuation_tags(opener=True, closer=True, slash=True) == component_tags(words=False, brackets=True, edges=True)
         print('exact-cycle and intermediate-information checks passed')
         return
     if args.summarize:

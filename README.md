@@ -205,6 +205,9 @@ punctuation, and boundary newlines. This keeps the newline token as the
 filler and adjusts only the length of the central filler to match the
 insertion budget. Tag variants are tokenized separately. This design reports
 factorial contrasts and one-component removals from the full tag pair.
+Use `--ablation-design punctuation` to cross the opening `[]`, closing
+brackets, and the slash at the closing site while retaining the boundary
+newlines. At that site the four conditions are empty, `/`, `[]`, and `[/]`.
 
 ## Interpretation
 
