@@ -190,6 +190,13 @@ JSONL. Use `--astra` to select the two pinned Qwen3.5 Astra sampling shards
 and replay with the original presence-penalty history. Both scripts support
 `--self-test`.
 
+Use `--astra --ablate-note PRIOR_REPLAY_DIR` to compare whitespace-only input,
+a prompt to continue solving, and a prompt to give the final answer. All three
+conditions reuse the exact prefix and the parent replay's per-prompt insertion
+length, sampling settings, and generation cap. `--draw-start` and `--draws`
+split the original draws into disjoint shards. `--summarize-ablation FILE ...`
+validates the paired matrix and reports prompt-level bootstrap contrasts.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.

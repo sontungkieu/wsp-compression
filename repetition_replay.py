@@ -2,6 +2,7 @@
 import argparse
 from collections import defaultdict
 from decimal import Decimal
+import hashlib
 import inspect
 import json
 from pathlib import Path
@@ -17,6 +18,12 @@ LLAMA_PHASES = ('cross', 'replicate_cross')
 ASTRA_PHASES = ('primary-a', 'primary-b')
 MINIMUM = 30
 FACT = re.compile(r'<<([0-9.()+*/ \-]+)=([-+]?\d+(?:\.\d+)?)>>')
+NOTE_TEXT = {
+    'neutral': '',
+    'continue': 'Keep solving the problem from the current step.',
+    'finalize': 'Give your final answer to the problem now.',
+}
+REPLAY_SEED = 28937
 
 
 def terminal_cycle(tokens):
@@ -110,6 +117,40 @@ def with_notes(tokenizer, prefix, fact, astra=False):
     return {'plain': prefix, 'fact': attach(fact_ids), 'placebo': attach(placebo_ids)}
 
 
+def prior_replay(path):
+    status = json.loads((path / 'status.json').read_text())
+    result = path / 'replay.jsonl'
+    if status['stage'] != 'completed' or sha(result) != status['sha256']:
+        raise ValueError('expected a completed, checksum-verified replay')
+    with result.open() as stream:
+        manifest = json.loads(next(stream))
+    if (manifest['mode'] != 'think' or manifest['sampling'] != {
+            'temperature': .6, 'top_p': .95, 'top_k': 20, 'presence_penalty': 1.5}):
+        raise ValueError('parent replay used different decoding')
+    return manifest, status['sha256'], status['deadline']
+
+
+def with_matched_notes(tokenizer, prefix, inserted_tokens):
+    def encode(text):
+        return tokenizer.encode(text, add_special_tokens=False)
+
+    start = encode('\n\n[Additional context]\n')
+    end = encode('\n[/Additional context]\n')
+    space = encode(' ')
+    if len(space) != 1:
+        raise ValueError('expected one space token for the neutral condition')
+    body = inserted_tokens - len(start) - len(end)
+    messages = {condition: encode(content) if content else [] for condition, content in NOTE_TEXT.items()}
+    if len(messages['continue']) != len(messages['finalize']):
+        raise ValueError('the two instructions must use the same number of tokens')
+    result = {}
+    for condition, tokens in messages.items():
+        if len(tokens) > body:
+            raise ValueError('parent insertion is too short for the treatment text')
+        result[condition] = prefix + start + tokens + space * (body - len(tokens)) + end
+    return result
+
+
 def run(args, identity, selected, verified):
     import torch
     import transformers
@@ -144,6 +185,17 @@ def run(args, identity, selected, verified):
     pad = tok.pad_token_id if tok.pad_token_id is not None else min(eos)
     mode = 'think' if args.astra else 'base'
     temperature, top_p, top_k = (.6, .95, 20) if args.astra else (.7, .9, 0)
+    ablation = args.ablate_note is not None
+    parent_cases = {}
+    if ablation:
+        source, source_sha, parent_deadline = prior_replay(args.ablate_note)
+        parent_cases = {case['id']: case for case in source['verified_cases']}
+        if (set(parent_cases) != {item['row']['id'] for item in selected}
+                or len(parent_cases) != source['eligible_unique']
+                or source['cap'] != args.cap or args.draw_start + args.draws > source['draws']
+                or source['data_sha'] != sha(args.data) or Path(source['model']) != path or source['eos_ids'] != eos
+                or args.deadline != parent_deadline):
+            raise ValueError('ablation must match the parent replay cohort, model, data, cap, draws and deadline')
     items = []
     for item in selected:
         prompt = tok.encode(render(tok, item['row'], mode), add_special_tokens=False)
@@ -151,36 +203,58 @@ def run(args, identity, selected, verified):
         prefix = prompt + prior
         seen = tok.decode(prior, skip_special_tokens=False)
         pending = args.astra and '</think>' not in seen
-        items.append({**item, 'prefixes': with_notes(tok, prefix, item['fact'], args.astra),
-                      'pending_thought': pending,
-                      'prior_final': assess(item['row'], seen, prior, False,
-                                            8192 if args.astra else 2048, args.astra)['correct'],
+        had_answer = assess(item['row'], seen, prior, False, 8192 if args.astra else 2048, args.astra)['correct']
+        details = {}
+        if ablation:
+            source_case = parent_cases[item['row']['id']]
+            lengths = source_case['prefix_len']
+            if (len(prefix) != lengths['plain'] or lengths['placebo'] != lengths['fact']
+                    or item['phase'] != source_case['phase'] or item['period'] != source_case['period']
+                    or had_answer != source_case['prior_final']):
+                raise ValueError('prefix or insertion does not match the parent replay')
+            inserted = lengths['placebo'] - lengths['plain']
+            prefixes = with_matched_notes(tok, prefix, inserted)
+            if any(len(ids) != len(prefix) + inserted or ids[:len(prefix)] != prefix for ids in prefixes.values()):
+                raise RuntimeError('ablation arms changed the original prefix or insertion length')
+            details = {'inserted_tokens': inserted,
+                       'original_prefix_sha256': hashlib.sha256(json.dumps(prefix).encode()).hexdigest()}
+        else:
+            prefixes = with_notes(tok, prefix, item['fact'], args.astra)
+        items.append({**item, 'prefixes': prefixes, 'pending_thought': pending, 'prior_final': had_answer,
+                      'ablation_details': details,
                       'fact_verbatim_in_original_prefix': item['fact'] in tok.decode(prefix)})
+    contexts = tuple(NOTE_TEXT) if ablation else ('plain', 'placebo', 'fact')
     header = {'kind': 'manifest', 'verified_unique': verified, 'eligible_unique': len(items),
               'model': str(path), 'source_sha': sha(Path(__file__)), 'data_sha': sha(args.data),
-              'cap': args.cap, 'draws': args.draws, 'min_cases': args.min_cases, 'eos_ids': eos, 'mode': mode,
+              'cap': args.cap, 'draws': args.draws, 'draw_start': args.draw_start,
+              'seed_base': REPLAY_SEED, 'min_cases': args.min_cases, 'eos_ids': eos, 'mode': mode,
               'sampling': {'temperature': temperature, 'top_p': top_p, 'top_k': top_k,
                            'presence_penalty': 1.5 if args.astra else 0.},
               'verified_cases': [{'id': i['row']['id'], 'phase': i['phase'], 'period': i['period'],
                                   'prior_final': i['prior_final'], 'hint': i['fact'],
                                   'fact_verbatim_in_original_prefix': i['fact_verbatim_in_original_prefix'],
+                                  **i['ablation_details'],
                                   'prefix_len': {k: len(v) for k, v in i['prefixes'].items()}} for i in items]}
+    if ablation:
+        header.update(note_ablation=NOTE_TEXT, parent_replay_sha256=source_sha, runtime={
+            'torch': str(torch.__version__), 'transformers': transformers.__version__, 'cuda': torch.version.cuda})
     start = time.monotonic()
     with args.output.open('x', buffering=1) as out, torch.inference_mode():
         print(json.dumps(header), file=out)
         print('start replay', len(items), 'of', verified, 'verified prompts', flush=True)
-        for sampled in (False, True):
+        for sampled in ((True,) if ablation else (False, True)):
             config = transformers.GenerationConfig(
                 max_new_tokens=args.cap, do_sample=sampled, eos_token_id=eos, pad_token_id=pad,
                 temperature=temperature if sampled else 1., top_p=top_p if sampled else 1.,
                 top_k=top_k if sampled else 50, repetition_penalty=1., use_cache=True)
-            for draw in range(args.draws if sampled else 1):
+            draws = range(args.draw_start, args.draw_start + args.draws) if sampled else range(1)
+            for draw in draws:
                 for begin in range(0, len(items), args.batch):
                     group = items[begin:begin + args.batch]
-                    for context in ('plain', 'placebo', 'fact'):
+                    for context in contexts:
                         if time.time() >= args.deadline - 120:
                             raise TimeoutError('approaching the original absolute deadline')
-                        torch.manual_seed(28937 + 10000 * draw + begin)
+                        torch.manual_seed(REPLAY_SEED + 10000 * draw + begin)
                         parts = [i['prefixes'][context] for i in group]
                         width = max(map(len, parts))
                         ids = torch.tensor([[pad] * (width - len(p)) + p for p in parts], device='cuda')
@@ -234,9 +308,77 @@ def summary(path):
     return {'complete': finished, 'eligible': head['eligible_unique'], 'verified': head['verified_unique'], 'cells': results}
 
 
+def summarize_ablation(paths):
+    cells = defaultdict(dict)
+    protocol = None
+    draws = set()
+    for path in paths:
+        with path.open() as stream:
+            head = json.loads(next(stream))
+            fingerprint = {key: head[key] for key in (
+                'parent_replay_sha256', 'note_ablation', 'verified_cases', 'sampling', 'model', 'cap',
+                'seed_base', 'runtime', 'eos_ids', 'source_sha', 'data_sha')}
+            if protocol is not None and protocol != fingerprint:
+                raise ValueError('ablation outputs have different protocols')
+            protocol = fingerprint
+            shard_draws = set(range(head['draw_start'], head['draw_start'] + head['draws']))
+            if draws & shard_draws:
+                raise ValueError('ablation shards repeated a draw')
+            draws.update(shard_draws)
+            complete = False
+            for line in stream:
+                row = json.loads(line)
+                if row['kind'] == 'complete':
+                    complete = True
+                    continue
+                key = row['id'], row['draw']
+                values = cells[row['context']]
+                if row['decoder'] != 'sample' or row['draw'] not in shard_draws or key in values:
+                    raise ValueError('unexpected or duplicate ablation rollout')
+                values[key] = row
+            if not complete:
+                raise ValueError('ablation shard is missing its completion footer')
+
+    cases_by_id = {c['id']: c for c in protocol['verified_cases']}
+    expected = {(case, draw) for case in cases_by_id for draw in draws}
+    if set(cells) != set(protocol['note_ablation']) or any(set(rows) != expected for rows in cells.values()):
+        raise ValueError('incomplete ablation matrix')
+    metrics = ('terminal_cycle', 'correct_final', 'eos', 'correct_and_no_terminal_cycle', 'new_correct_and_eos')
+    by = {}
+    results = {}
+    for arm, rows in cells.items():
+        outcomes = defaultdict(list)
+        for (case, _), row in rows.items():
+            loop = bool(row['terminal_cycle'])
+            outcomes[case].append((loop, row['correct_final'], row['eos'], row['correct_final'] and not loop,
+                                   row['good_termination'] and not cases_by_id[case]['prior_final']))
+        by[arm] = {case: [statistics.fmean(flags) for flags in zip(*values, strict=True)]
+                   for case, values in outcomes.items()}
+        results[arm] = {name: sum(v[i] for values in outcomes.values() for v in values)
+                        for i, name in enumerate(metrics)}
+        results[arm]['prompts_new_correct_and_eos'] = sum(x[-1] > 0 for x in by[arm].values())
+
+    rng = random.Random(11738)
+    contrasts = {}
+    for a, b in (('continue', 'neutral'), ('finalize', 'neutral'), ('finalize', 'continue')):
+        comparison = {}
+        for metric in ('terminal_cycle', 'new_correct_and_eos'):
+            i = metrics.index(metric)
+            paired = [by[a][case][i] - by[b][case][i] for case in sorted(cases_by_id)]
+            boot = sorted(statistics.fmean(rng.choices(paired, k=len(paired))) for _ in range(3000))
+            comparison[metric] = {'delta_pp': round(100 * statistics.fmean(paired), 2),
+                                  'ci95_pp': [round(100 * boot[x], 2) for x in (75, 2924)]}
+        contrasts[f'{a}_minus_{b}'] = comparison
+    return {'prompts': len(cases_by_id), 'draw_ids': sorted(draws), 'rollouts_per_arm': len(expected),
+            'inserted_token_counts': sorted({item['inserted_tokens'] for item in cases_by_id.values()}),
+            'cap': protocol['cap'], 'sampling': protocol['sampling'], 'runtime': protocol['runtime'],
+            'notes': protocol['note_ablation'], 'arms': results, 'paired_prompt_bootstrap': contrasts}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--summarize', type=Path)
+    parser.add_argument('--summarize-ablation', type=Path, nargs='+')
     parser.add_argument('--baseline-lane', type=Path)
     parser.add_argument('--astra', action='store_true', help='use pinned Qwen3.5 thinking-mode baseline shards')
     parser.add_argument('--data', type=Path)
@@ -244,10 +386,12 @@ def main():
     parser.add_argument('--deadline', type=int)
     parser.add_argument('--cap', type=int, default=512)
     parser.add_argument('--draws', type=int, default=8)
+    parser.add_argument('--draw-start', type=int, default=0)
     parser.add_argument('--batch', type=int, default=8)
     parser.add_argument('--min-cases', type=int, default=MINIMUM)
     parser.add_argument('--inventory', action='store_true')
     parser.add_argument('--self-test', action='store_true')
+    parser.add_argument('--ablate-note', type=Path, help='match the cohort and inserted token count of a completed Astra replay directory')
     args = parser.parse_args()
     if args.self_test:
         assert terminal_cycle(list(range(7)) * 20) == (7, 35)
@@ -260,6 +404,9 @@ def main():
     if args.summarize:
         print(json.dumps(summary(args.summarize)))
         return
+    if args.summarize_ablation:
+        print(json.dumps(summarize_ablation(args.summarize_ablation)))
+        return
     if not args.baseline_lane or not args.data:
         parser.error('baseline lane and pinned dataset required')
     identity, selected, verified = cases(args.baseline_lane, args.data, args.astra)
@@ -268,6 +415,10 @@ def main():
         return
     if not args.output or not args.deadline or min(args.cap, args.batch, args.draws, args.min_cases) < 1:
         parser.error('invalid output, deadline or sampling contract')
+    if args.draw_start < 0 or (args.draw_start and not args.ablate_note):
+        parser.error('nonzero draw offsets are for ablation shards')
+    if args.ablate_note and not args.astra:
+        parser.error('note ablation requires --astra')
     if len(selected) < args.min_cases:
         raise SystemExit('too few independently verified prompts with an intermediate cue')
     run(args, identity, selected, verified)
