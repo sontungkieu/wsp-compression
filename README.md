@@ -155,6 +155,25 @@ The earlier one-GPU campaign completed all 82 planned conditions in about
 3 hours 15 minutes with zero failed jobs. Its recovered metric summary is
 available in `night6h_result_summary.json`.
 
+### Repetition diagnosis on original weights
+
+`repetition_baseline.py` evaluates unmodified local checkpoints on a pinned
+GSM8K panel, closed-set enumeration and exact intended repetition. It records
+raw completions, lexical recurrence, a verifier outcome and native stop/cap
+information. Detector matches are exploratory until audited against human or
+task-state labels. Run `python3 -B repetition_baseline.py --self-test` for the
+offline checks and `--summarize PATH` for per-panel counts.
+
+`repetition_baseline_queue.py` schedules four independent baseline lanes on the
+GPU UUIDs and deadline of the explicitly named predecessor. It runs small
+canaries before paired panels and keeps partial rollout logs. The optional
+`--retire-pilot` flag stops only the verified predecessor pilot workers on
+those lanes, after the recorded natural-runtime failure. The supervisor may
+use system Python and pass the CUDA runtime through `--worker-python`. A
+continuation can select lanes with `--gpu` and wait for a named baseline run
+with `--after-baseline`. Both commands support `--help`. The queue measures checkpoint and decoder comparisons before any
+causal interpretation or targeted weight edit.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
