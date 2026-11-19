@@ -134,12 +134,21 @@ def learn_mask(model, calibration, targets, protected, pools, args):
     y_loop = torch.tensor(targets, device=device, dtype=torch.long)[:, :args.probe_tokens]
     x_loop = torch.cat((x_loop, y_loop[:, :-1]), dim=-1)
     x_clean = torch.tensor(protected, device=device, dtype=torch.long)
+    if args.copy_weight:
+        x_clean, x_copy = x_clean.chunk(2)
+        y_copy = torch.tensor(targets, device=device, dtype=torch.long)[:, :args.copy_probe_tokens]
+        x_copy = torch.cat((x_copy, y_copy[:, :-1]), dim=-1)
     generator = torch.Generator(device=device).manual_seed(args.seed + 113)
     reference = []
     with torch.no_grad():
         for batch in x_clean.split(args.batch):
             reference.append(logits(batch, -1).log_softmax(-1).cpu())
     reference = torch.cat(reference)
+    copy_reference = None
+    if args.copy_weight and args.copy_loss == 'kl':
+        with torch.no_grad():
+            copy_reference = torch.cat([logits(b, slice(width - 1, None)).log_softmax(-1).cpu()
+                                       for b in x_copy.split(args.batch)])
     masks, initial, registered, history = {}, {}, [], []
     try:
         for i, (module, candidates, count) in pools.items():
@@ -153,7 +162,7 @@ def learn_mask(model, calibration, targets, protected, pools, args):
         for step in range(args.steps):
             batch = min(args.batch, n)
             ix = torch.randperm(n, generator=generator, device=device)[:batch]
-            iy = torch.randperm(len(protected), generator=generator, device=device)[:batch]
+            iy = torch.randperm(len(x_clean), generator=generator, device=device)[:batch]
             optim.zero_grad(set_to_none=True)
             z = logits(x_loop[ix], slice(width - 1, None))
             other = z.scatter(-1, y_loop[ix, :, None], -torch.inf)
@@ -164,13 +173,24 @@ def learn_mask(model, calibration, targets, protected, pools, args):
             protect = F.kl_div(logits(x_clean[iy], -1).log_softmax(-1), ref,
                                reduction='batchmean', log_target=True)
             (args.preserve_weight * protect).backward()
-            if not bool(torch.isfinite(unlikelihood) & torch.isfinite(protect)):
+            copy_loss = torch.zeros((), device=device)
+            if args.copy_weight:
+                copy_logits = logits(x_copy[ix], slice(width - 1, None))
+                if copy_reference is None:
+                    copy_loss = F.cross_entropy(copy_logits.flatten(0, 1), y_copy[ix].flatten())
+                else:
+                    clean_copy = copy_reference[ix.cpu()].to(device)
+                    copy_loss = F.kl_div(copy_logits.log_softmax(-1), clean_copy, log_target=True,
+                                         reduction='sum') / y_copy[ix].numel()
+                (args.copy_weight * copy_loss).backward()
+            if not bool(torch.isfinite(unlikelihood) & torch.isfinite(protect) & torch.isfinite(copy_loss)):
                 raise RuntimeError('nonfinite calibration loss')
             grad_norm = torch.nn.utils.clip_grad_norm_([mask.scores for mask in masks.values()],
                                                       max_norm=1., error_if_nonfinite=True)
             optim.step()
             record = {'step': step + 1, 'unlikelihood': float(unlikelihood.detach()),
-                      'protection_kl': float(protect.detach()), 'grad_norm': float(grad_norm)}
+                      'protection_kl': float(protect.detach()), 'copy_loss': float(copy_loss.detach()),
+                      'grad_norm': float(grad_norm)}
             history.append(record)
             if step == 0 or (step + 1) % 8 == 0 or step + 1 == args.steps:
                 print(json.dumps(record), flush=True)
@@ -210,6 +230,20 @@ def edited(changes):
                 weight[indices] = original
 
 
+def magnitude_control(pool, weight, learned, generator):
+    """Keep the learned mask's deletion counts per magnitude stratum."""
+    import torch
+
+    ranked = pool[weight.detach().view(-1)[pool].abs().sort().indices]
+    selected = torch.isin(ranked, learned)
+    strata = []
+    for group, mask in zip(ranked.tensor_split(16), selected.tensor_split(16), strict=True):
+        count = int(mask.sum())
+        order = torch.randperm(group.numel(), device=pool.device, generator=generator)
+        strata.append(group[order[:count]])
+    return torch.cat(strata)
+
+
 def run(args):
     import torch
     import transformers
@@ -234,13 +268,14 @@ def run(args):
                      truncation=True, max_length=60000).input_ids
     copy_prefix = tokenizer('Continue copying this exact repeated sequence: ',
                             add_special_tokens=False).input_ids
-    if len(copy_prefix) > 72 - 3 * args.period:
+    test_period = args.test_period or args.period
+    if len(copy_prefix) > 72 - max(3 * args.period, args.test_repetitions * test_period):
         raise ValueError('copy instruction overlaps the repeated motif')
     rng = random.Random(args.seed)
     clean, loop, copy, target = examples(train, args.offset, args.rows, args.period, rng, copy_prefix)
     test_start = args.test_offset % max(1, len(test) - 72 * args.test_rows + 1)
     clean_test, loop_test, copy_test, target_test = examples(
-        test, test_start, args.test_rows, args.period, rng, copy_prefix)
+        test, test_start, args.test_rows, test_period, rng, copy_prefix, args.test_repetitions)
 
     projection = find_projection(model, loop, clean, args.batch, args.layers, args.columns)
     layers = model.model.layers
@@ -262,6 +297,10 @@ def run(args):
         selected = {i: pool[torch.randperm(pool.numel(), device=device, generator=generator)[:count]]
                     for i, (_, pool, count) in pools.items()}
         arms[f'random_deletion_{trial}'] = deletions(selected)
+    if args.magnitude_control:
+        matched = {i: magnitude_control(pool, module.weight, learned[i], generator)
+                   for i, (module, pool, _) in pools.items()}
+        arms['magnitude_matched_random'] = deletions(matched)
 
     eos = model.generation_config.eos_token_id or tokenizer.eos_token_id
     ends = [eos] if isinstance(eos, int) else list(eos)
@@ -282,7 +321,7 @@ def run(args):
             greedy = assess(loop_test, args.eval_horizon, args.seed + 900, False)
             sample = [assess(loop_test, args.eval_horizon, args.seed + 901 + draw, True)
                       for draw in range(args.eval_draws)]
-            copy_rows = assess(copy_test, args.period, args.seed + 950, False)
+            copy_rows = assess(copy_test, test_period, args.seed + 950, False)
             clean_logp = last_logits(model, clean_test, batch_size=args.batch).log_softmax(-1)
             kl = (base.exp() * (base - clean_logp)).sum(-1).tolist()
             measurements[arm] = {'edit': footprint, 'greedy': greedy, 'sampling': sample,
@@ -298,7 +337,10 @@ def run(args):
 
     comparisons = {}
     random_arms = [arm for arm in measurements if arm.startswith('random_deletion_')]
-    for control in ['original', 'astra_projection', 'random_mean']:
+    controls = ['original', 'astra_projection', 'random_mean']
+    if args.magnitude_control:
+        controls.append('magnitude_matched_random')
+    for control in controls:
         metrics = {}
         for policy, metric in [('greedy', 'aligned'), ('greedy', 'recurrence'),
                                ('greedy', 'length'), ('greedy', 'stopped'),
@@ -344,14 +386,24 @@ def main():
         parser.add_argument('--' + name.replace('_', '-'), type=int, default=default)
     parser.add_argument('--lr', type=float, default=.05)
     parser.add_argument('--preserve-weight', type=float, default=1.)
+    parser.add_argument('--copy-weight', type=float, default=0.)
+    parser.add_argument('--copy-probe-tokens', type=int, default=4)
+    parser.add_argument('--copy-loss', choices=('kl', 'target'), default='kl')
+    parser.add_argument('--test-period', type=int, default=0)
+    parser.add_argument('--test-repetitions', type=int, choices=(1, 2, 3), default=3)
+    parser.add_argument('--magnitude-control', action='store_true')
     parser.add_argument('--mask-module', choices=('gate_proj', 'down_proj'), default='gate_proj')
     args = parser.parse_args()
     if any(getattr(args, name) <= 0 for name in defaults if name not in ('seed', 'offset', 'test_offset')):
         parser.error('counts must be positive')
     if args.offset < 0 or args.test_offset < 0 or not (1 <= args.probe_tokens <= args.period <= 16):
         parser.error('invalid offsets, period, or calibration horizon')
-    if args.eval_horizon <= 2 * args.period or args.candidate_multiple < 2:
+    test_period = args.test_period or args.period
+    if not 1 <= test_period <= 16 or args.eval_horizon <= 2 * test_period or args.candidate_multiple < 2:
         parser.error('rollout must cover at least two motif spans and the candidate pool must exceed budget')
+    if (not math.isfinite(args.copy_weight) or args.copy_weight < 0 or args.copy_probe_tokens < 1
+            or (args.copy_weight and args.copy_probe_tokens > args.period)):
+        parser.error('invalid copy protection weight or horizon')
     if not math.isfinite(args.lr) or args.lr <= 0. or not math.isfinite(args.preserve_weight) or args.preserve_weight < 0.:
         parser.error('invalid learning rate or preservation weight')
     if args.train.resolve() == args.test.resolve():

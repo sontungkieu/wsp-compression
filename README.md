@@ -140,6 +140,17 @@ The queue begins with a small canary, followed by gate and down-projection
 conditions at two budgets and three motif lengths. Use the host, GPU UUID,
 available time, and immutable parent plan from the active allocation.
 
+`insight_campaign.py` defines a ten-hour, eight-GPU follow-up queue. Two
+lanes sweep multi-token copy protection by KL or exact-token likelihood.
+Two lanes test motif-period and prefix-repetition transfer. Four pairwise
+matched lanes compare loop-only editing and a direction derived from the end
+of training rationales, across GSM8K subsets and decoding conditions. Natural
+results also track answers given after `</think>`. The synthetic lanes record
+an additional random control matched by per-layer magnitude strata. The
+launcher pins input and source hashes, records each deadline and maintains
+`audit.json` from validated result receipts. Run `--help` for the required
+host, GPU UUIDs, deadline, parent plan, and natural asset manifest.
+
 The earlier one-GPU campaign completed all 82 planned conditions in about
 3 hours 15 minutes with zero failed jobs. Its recovered metric summary is
 available in `night6h_result_summary.json`.

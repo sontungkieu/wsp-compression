@@ -10,7 +10,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
 
-def examples(ids, start, count, period, rng, copy_instruction):
+def examples(ids, start, count, period, rng, copy_instruction, repetitions=3):
     width = 72
     if start + width * count > len(ids):
         raise ValueError('insufficient input tokens')
@@ -18,7 +18,7 @@ def examples(ids, start, count, period, rng, copy_instruction):
     for i in range(count):
         row = ids[start + i * width:start + (i + 1) * width]
         motif = row[-period:]
-        repeated = row[:-3 * period] + motif * 3
+        repeated = row[:-repetitions * period] + motif * repetitions
         clean.append(row)
         positive.append(repeated)
         copy.append(copy_instruction + repeated[len(copy_instruction):])

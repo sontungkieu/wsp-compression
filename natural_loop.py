@@ -57,10 +57,14 @@ def score(tokenizer, rows, outputs, limit):
     for row, tokens in zip(rows, outputs):
         completion = tokenizer.decode(tokens, skip_special_tokens=False)
         boxes = re.findall(r'\\boxed\{([^{}]+)\}', completion)
+        _, found_end, answer_text = completion.partition('</think>')
+        final_boxes = re.findall(r'\\boxed\{([^{}]+)\}', answer_text)
         gold = number(row['answer'].rsplit('####', 1)[-1])
         guess = number(boxes[-1]) if boxes else None
         results.append({'id': row['id'], 'correct': gold is not None and guess == gold,
-                        'boxed_answer': guess, 'ended_thinking': '</think>' in completion,
+                        'correct_after_thinking': bool(found_end and final_boxes and gold is not None
+                                                       and number(final_boxes[-1]) == gold),
+                        'boxed_answer': guess, 'ended_thinking': bool(found_end),
                         'hit_cap': len(tokens) == limit, 'length': len(tokens),
                         'repeat_steps': sum(1 for _ in periodic_steps(tokens)),
                         'recurrent_16gram_steps': sum(1 for _ in recurrent_steps(tokens))})
@@ -99,13 +103,16 @@ def run(args):
         def __call__(self, input_ids, scores):
             seen = torch.zeros_like(scores, dtype=torch.bool)
             seen.scatter_(1, input_ids[:, self.prompt_width:], True)
-            return scores - 1.5 * seen
+            return scores - args.presence * seen
 
     def sample(split, count, split_seed):
         rows = parquet.read_table(assets / f'{split}-00000-of-00001.parquet').to_pylist()
         indices = list(range(len(rows)))
         random.Random(split_seed).shuffle(indices)
-        start = args.shard * count
+        fixed_offset = args.train_offset if split == 'train' else args.test_offset
+        start = args.shard * count if fixed_offset is None else fixed_offset
+        if start < 0 or start + count > len(indices):
+            raise ValueError(f'{split} offsets outside dataset')
         return [dict(rows[i], id=i) for i in indices[start:start + count]]
 
     def prompts(rows):
@@ -124,8 +131,9 @@ def run(args):
             batch = tokenizer(prompts(rows[start:start + args.batch]), return_tensors='pt',
                               add_special_tokens=False, padding=True).to('cuda:0')
             width = batch.input_ids.shape[1]
-            outputs = model.generate(**batch, do_sample=True, temperature=.6, top_p=.95,
-                                     top_k=20, max_new_tokens=limit, eos_token_id=list(stop_ids),
+            settings = (dict(do_sample=True, temperature=.6, top_p=.95, top_k=20)
+                        if args.decoder == 'sample' else dict(do_sample=False, temperature=1., top_p=1., top_k=None))
+            outputs = model.generate(**batch, **settings, max_new_tokens=limit, eos_token_id=list(stop_ids),
                                      pad_token_id=pad, logits_processor=[PresencePenalty(width)])
             for prefix, mask, answer in zip(batch.input_ids, batch.attention_mask, outputs[:, width:]):
                 tokens = answer.tolist()
@@ -148,6 +156,7 @@ def run(args):
     heldout = sample('test', args.test, 412)
     sequences = generate(train, args.tokens)
     positives, negatives, target = [], [], []
+    conclude, progress = [], []
     train_rows = []
     for row, (prompt, tokens) in zip(train, sequences):
         bad = onset(tokens, args.detector)
@@ -172,6 +181,16 @@ def run(args):
     if len(positives) < 8:
         raise SystemExit('fewer than eight natural loop pairs at this token budget')
 
+    if args.conclusion_beta:
+        for row, (prompt, _) in zip(train, sequences, strict=True):
+            explanation = row['answer'].split('####', 1)[0].strip()
+            rationale = tokenizer(explanation, add_special_tokens=False).input_ids
+            if len(rationale) >= 24:
+                conclude.append(prompt + rationale)
+                progress.append(prompt + rationale[:len(rationale) // 2])
+        if len(conclude) < 8:
+            raise SystemExit('fewer than eight supervised rationale pairs')
+
     indexes = (15, 19)
     capture = {index: [] for index in indexes}
 
@@ -185,16 +204,25 @@ def run(args):
     handles = [layer.register_forward_hook(hook(i)) for i, layer in zip(indexes, layers)]
     start_e = measure(positives)
     start_p = measure(negatives)
+    if conclude:
+        measure(conclude)
+        measure(progress)
     for handle in handles:
         handle.remove()
     changes, selected_columns = [], []
     for i, layer in zip(indexes, layers):
         activation, output = (torch.stack(items) for items in zip(*capture[i]))
         n = len(positives)
-        direction = output[:n].mean(0) - output[n:].mean(0)
+        direction = output[:n].mean(0) - output[n:2 * n].mean(0)
         direction /= direction.norm().clamp_min(1e-12)
+        if conclude:
+            m = len(conclude)
+            ending = output[2 * n:2 * n + m].mean(0) - output[2 * n + m:].mean(0)
+            ending /= ending.norm().clamp_min(1e-12)
+            direction -= args.conclusion_beta * ending
+            direction /= direction.norm().clamp_min(1e-12)
         writer_projection = direction @ layer.weight.detach().float()
-        contrast = activation[:n].mean(0) - activation[n:].mean(0)
+        contrast = activation[:n].mean(0) - activation[n:2 * n].mean(0)
         selected = (contrast * writer_projection).topk(64).indices
         delta = torch.zeros_like(layer.weight, dtype=torch.float32)
         delta[:, selected] = -direction[:, None] * writer_projection[selected]
@@ -216,6 +244,9 @@ def run(args):
                                           float(patch.norms.norm()), 1.)
     queue.save(root / 'fit.json', {'diagnostic': fit_info, 'columns': selected_columns,
                                    'model_sha256': manifest['artifacts'],
+                                   'conclusion_beta': args.conclusion_beta,
+                                   'supervised_rationale_pairs': len(conclude),
+                                   'decoder': args.decoder, 'presence': args.presence,
                                    'torch': torch.__version__, 'transformers': transformers.__version__})
     for name, values in [('original', torch.zeros_like(coefficients)),
                          ('sparse_projection', patch.norms),
@@ -285,9 +316,9 @@ def main():
     group.add_argument('--probe', action='store_true')
     parser.add_argument('--assets', type=Path, required=True)
     parser.add_argument('--root', type=Path, required=True)
-    parser.add_argument('--after', type=Path, required=True)
-    parser.add_argument('--gpu', type=int, choices=(0, 1), required=True)
-    parser.add_argument('--lane', type=int, choices=(0, 1), required=True)
+    parser.add_argument('--after', type=Path)
+    parser.add_argument('--gpu', type=int, choices=range(8), required=True)
+    parser.add_argument('--lane', type=int, choices=range(8), required=True)
     parser.add_argument('--uuid', required=True)
     parser.add_argument('--deadline', type=int, required=True)
     parser.add_argument('--seed', type=int, default=41)
@@ -297,7 +328,14 @@ def main():
     parser.add_argument('--train', type=int, default=24)
     parser.add_argument('--test', type=int, default=48)
     parser.add_argument('--batch', type=int, default=4)
+    parser.add_argument('--train-offset', type=int)
+    parser.add_argument('--test-offset', type=int)
+    parser.add_argument('--decoder', choices=('greedy', 'sample'), default='sample')
+    parser.add_argument('--presence', type=float, default=1.5)
+    parser.add_argument('--conclusion-beta', type=float, choices=(0., .25, .5, 1.), default=0.)
     args = parser.parse_args()
+    if not args.worker and not args.probe and args.after is None:
+        parser.error('--after is required when supervising a predecessor')
     if args.probe:
         import pyarrow.parquet as parquet
         from transformers import AutoConfig, AutoModelForImageTextToText, AutoTokenizer
