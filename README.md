@@ -214,6 +214,25 @@ the same boundary newlines and central newline-token filler at the original
 insertion length. The summary compares the square pair with each control and
 estimates the interaction of the two square-bracket characters.
 
+`repetition_mediation.py` compares empty, opening-square, and round-pair
+closing marks and exchanges the probability mass of `Wait` variants and
+`</think>` between the empty and opening-square conditions. Each donor
+and receiver pair follows the same generated history. The exchange preserves
+the receiver's within-group relative probabilities and uses the original
+top-k and top-p filters after mixing. It operates during reasoning, ending at
+the first generated `</think>`. The calibration cohort retains its original
+insertion budget, and the held-out cohort uses 41 inserted tokens in every
+arm. The report includes prompt-paired intervals, exact-cycle recurrence,
+EOS, correct answers, and strata for Wait loops and other loops.
+
+`repetition_mediation_queue.py` launches detached, deadline-bounded
+supervisors on the eight-GPU discovery and four-GPU calibration nodes.
+It verifies baseline shards, freezes a 64-prompt holdout disjoint from the
+discovery panel, and checks the calibration summary before distributing
+held-out replay across both nodes. It runs the joint swap, separate
+one-group swaps, and a longer-cap replay on a fixed 24-prompt subset.
+Each node writes its own receipts under a fresh shared run directory.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
