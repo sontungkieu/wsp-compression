@@ -196,6 +196,10 @@ conditions reuse the exact prefix and the parent replay's per-prompt insertion
 length, sampling settings, and generation cap. `--draw-start` and `--draws`
 split the original draws into disjoint shards. `--summarize-ablation FILE ...`
 validates the paired matrix and reports prompt-level bootstrap contrasts.
+Add `--ablation-design frame` to cross the presence of the context delimiters
+with three single-token fillers (space, newline, period). Each condition
+keeps the same total insertion length. The summary includes within-filler
+frame effects and comparisons against the period control.
 
 ## Interpretation
 

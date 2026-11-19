@@ -23,6 +23,11 @@ NOTE_TEXT = {
     'continue': 'Keep solving the problem from the current step.',
     'finalize': 'Give your final answer to the problem now.',
 }
+CONTEXT_OPEN = '\n\n[Additional context]\n'
+CONTEXT_CLOSE = '\n[/Additional context]\n'
+FRAME_FILLERS = {'spaces': ' ', 'newlines': '\n', 'periods': '.'}
+FRAME_ARMS = {f'{frame}_{name}': {'frame': frame == 'framed', 'filler': filler}
+              for frame in ('bare', 'framed') for name, filler in FRAME_FILLERS.items()}
 REPLAY_SEED = 28937
 
 
@@ -134,8 +139,8 @@ def with_matched_notes(tokenizer, prefix, inserted_tokens):
     def encode(text):
         return tokenizer.encode(text, add_special_tokens=False)
 
-    start = encode('\n\n[Additional context]\n')
-    end = encode('\n[/Additional context]\n')
+    start = encode(CONTEXT_OPEN)
+    end = encode(CONTEXT_CLOSE)
     space = encode(' ')
     if len(space) != 1:
         raise ValueError('expected one space token for the neutral condition')
@@ -148,6 +153,23 @@ def with_matched_notes(tokenizer, prefix, inserted_tokens):
         if len(tokens) > body:
             raise ValueError('parent insertion is too short for the treatment text')
         result[condition] = prefix + start + tokens + space * (body - len(tokens)) + end
+    return result
+
+
+def with_frame_ablation(tokenizer, prefix, inserted_tokens):
+    def encode(text):
+        return tokenizer.encode(text, add_special_tokens=False)
+
+    start, end = encode(CONTEXT_OPEN), encode(CONTEXT_CLOSE)
+    body = inserted_tokens - len(start) - len(end)
+    tokens = {text: encode(text) for text in FRAME_FILLERS.values()}
+    if body < 1 or any(len(ids) != 1 for ids in tokens.values()):
+        raise ValueError('frame ablation requires room for one-token fillers')
+    result = {}
+    for name, arm in FRAME_ARMS.items():
+        filler = tokens[arm['filler']]
+        suffix = start + filler * body + end if arm['frame'] else filler * inserted_tokens
+        result[name] = prefix + suffix
     return result
 
 
@@ -186,6 +208,7 @@ def run(args, identity, selected, verified):
     mode = 'think' if args.astra else 'base'
     temperature, top_p, top_k = (.6, .95, 20) if args.astra else (.7, .9, 0)
     ablation = args.ablate_note is not None
+    arms, attach = (FRAME_ARMS, with_frame_ablation) if args.ablation_design == 'frame' else (NOTE_TEXT, with_matched_notes)
     parent_cases = {}
     if ablation:
         source, source_sha, parent_deadline = prior_replay(args.ablate_note)
@@ -213,7 +236,7 @@ def run(args, identity, selected, verified):
                     or had_answer != source_case['prior_final']):
                 raise ValueError('prefix or insertion does not match the parent replay')
             inserted = lengths['placebo'] - lengths['plain']
-            prefixes = with_matched_notes(tok, prefix, inserted)
+            prefixes = attach(tok, prefix, inserted)
             if any(len(ids) != len(prefix) + inserted or ids[:len(prefix)] != prefix for ids in prefixes.values()):
                 raise RuntimeError('ablation arms changed the original prefix or insertion length')
             details = {'inserted_tokens': inserted,
@@ -223,7 +246,7 @@ def run(args, identity, selected, verified):
         items.append({**item, 'prefixes': prefixes, 'pending_thought': pending, 'prior_final': had_answer,
                       'ablation_details': details,
                       'fact_verbatim_in_original_prefix': item['fact'] in tok.decode(prefix)})
-    contexts = tuple(NOTE_TEXT) if ablation else ('plain', 'placebo', 'fact')
+    contexts = tuple(arms) if ablation else ('plain', 'placebo', 'fact')
     header = {'kind': 'manifest', 'verified_unique': verified, 'eligible_unique': len(items),
               'model': str(path), 'source_sha': sha(Path(__file__)), 'data_sha': sha(args.data),
               'cap': args.cap, 'draws': args.draws, 'draw_start': args.draw_start,
@@ -236,7 +259,7 @@ def run(args, identity, selected, verified):
                                   **i['ablation_details'],
                                   'prefix_len': {k: len(v) for k, v in i['prefixes'].items()}} for i in items]}
     if ablation:
-        header.update(note_ablation=NOTE_TEXT, parent_replay_sha256=source_sha, runtime={
+        header.update(note_ablation=arms, ablation_design=args.ablation_design, parent_replay_sha256=source_sha, runtime={
             'torch': str(torch.__version__), 'transformers': transformers.__version__, 'cuda': torch.version.cuda})
     start = time.monotonic()
     with args.output.open('x', buffering=1) as out, torch.inference_mode():
@@ -308,6 +331,23 @@ def summary(path):
     return {'complete': finished, 'eligible': head['eligible_unique'], 'verified': head['verified_unique'], 'cells': results}
 
 
+def ablation_contrasts(design):
+    if design == 'instructions':
+        return {f'{a}_minus_{b}': {a: 1, b: -1} for a, b in (
+            ('continue', 'neutral'), ('finalize', 'neutral'), ('finalize', 'continue'))}
+
+    frame_effects = {f'frame_effect_{f}': {f'framed_{f}': 1, f'bare_{f}': -1} for f in FRAME_FILLERS}
+    return {
+        **frame_effects,
+        'frame_effect_average': {arm: (1 if spec['frame'] else -1) / len(FRAME_FILLERS)
+                                 for arm, spec in FRAME_ARMS.items()},
+        **{f'{f}_minus_periods_{frame}': {f'{frame}_{f}': 1, f'{frame}_periods': -1}
+           for f in ('spaces', 'newlines') for frame in ('bare', 'framed')},
+        'frame_by_spaces_vs_periods': {'framed_spaces': 1, 'bare_spaces': -1,
+                                     'framed_periods': -1, 'bare_periods': 1},
+    }
+
+
 def summarize_ablation(paths):
     cells = defaultdict(dict)
     protocol = None
@@ -318,6 +358,7 @@ def summarize_ablation(paths):
             fingerprint = {key: head[key] for key in (
                 'parent_replay_sha256', 'note_ablation', 'verified_cases', 'sampling', 'model', 'cap',
                 'seed_base', 'runtime', 'eos_ids', 'source_sha', 'data_sha')}
+            fingerprint['ablation_design'] = head.get('ablation_design', 'instructions')
             if protocol is not None and protocol != fingerprint:
                 raise ValueError('ablation outputs have different protocols')
             protocol = fingerprint
@@ -360,19 +401,20 @@ def summarize_ablation(paths):
 
     rng = random.Random(11738)
     contrasts = {}
-    for a, b in (('continue', 'neutral'), ('finalize', 'neutral'), ('finalize', 'continue')):
+    for name, weights in ablation_contrasts(protocol['ablation_design']).items():
         comparison = {}
         for metric in ('terminal_cycle', 'new_correct_and_eos'):
             i = metrics.index(metric)
-            paired = [by[a][case][i] - by[b][case][i] for case in sorted(cases_by_id)]
+            paired = [sum(coef * by[arm][case][i] for arm, coef in weights.items()) for case in sorted(cases_by_id)]
             boot = sorted(statistics.fmean(rng.choices(paired, k=len(paired))) for _ in range(3000))
             comparison[metric] = {'delta_pp': round(100 * statistics.fmean(paired), 2),
                                   'ci95_pp': [round(100 * boot[x], 2) for x in (75, 2924)]}
-        contrasts[f'{a}_minus_{b}'] = comparison
+        contrasts[name] = comparison
     return {'prompts': len(cases_by_id), 'draw_ids': sorted(draws), 'rollouts_per_arm': len(expected),
             'inserted_token_counts': sorted({item['inserted_tokens'] for item in cases_by_id.values()}),
             'cap': protocol['cap'], 'sampling': protocol['sampling'], 'runtime': protocol['runtime'],
-            'notes': protocol['note_ablation'], 'arms': results, 'paired_prompt_bootstrap': contrasts}
+            'ablation_design': protocol['ablation_design'], 'notes': protocol['note_ablation'],
+            'arms': results, 'paired_prompt_bootstrap': contrasts}
 
 
 def main():
@@ -392,6 +434,7 @@ def main():
     parser.add_argument('--inventory', action='store_true')
     parser.add_argument('--self-test', action='store_true')
     parser.add_argument('--ablate-note', type=Path, help='match the cohort and inserted token count of a completed Astra replay directory')
+    parser.add_argument('--ablation-design', choices=('instructions', 'frame'), default='instructions')
     args = parser.parse_args()
     if args.self_test:
         assert terminal_cycle(list(range(7)) * 20) == (7, 35)
@@ -419,6 +462,8 @@ def main():
         parser.error('nonzero draw offsets are for ablation shards')
     if args.ablate_note and not args.astra:
         parser.error('note ablation requires --astra')
+    if args.ablation_design == 'frame' and not args.ablate_note:
+        parser.error('frame ablation requires --ablate-note')
     if len(selected) < args.min_cases:
         raise SystemExit('too few independently verified prompts with an intermediate cue')
     run(args, identity, selected, verified)
