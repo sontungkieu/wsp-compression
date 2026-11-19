@@ -186,7 +186,9 @@ the original token prefix, compares greedy and nucleus sampling, and
 compares a verified intermediate calculation with a token-length-matched
 placebo. `--inventory` is a CPU-only check for the case gate, and
 `--summarize` reports prompt-weighted continuation metrics from the raw
-JSONL. Both scripts support `--self-test`.
+JSONL. Use `--astra` to select the two pinned Qwen3.5 Astra sampling shards
+and replay with the original presence-penalty history. Both scripts support
+`--self-test`.
 
 ## Interpretation
 
