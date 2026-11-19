@@ -160,8 +160,9 @@ def summarize(path):
             key = row['mode'], row['decoder'], row['task'], cap
             counts, lengths = groups.setdefault(key, (Counter(), []))
             counts['n'] += 1
-            for field in ('correct', 'answer_found', 'eos', 'cap', 'intended_repeat', 'think_closed'):
+            for field in ('correct', 'answer_found', 'eos', 'intended_repeat', 'think_closed'):
                 counts[field] += int(score[field])
+            counts['hit_cap'] += int(score['cap'])
             for field in ('periodic', 'recurrent16', 'enumeration_stall_proxy'):
                 counts[field] += int(bool(score[field]))
                 counts[field + '_and_incorrect'] += int(bool(score[field]) and not score['correct'])
@@ -279,7 +280,16 @@ def self_test():
     assert not assess(math, 'Final: 12', [1], False, 5, pending_thought=True)['correct']
     assert assess(math, '4</think>Final: 12', [1], True, 5, pending_thought=True)['correct']
     assert not assess(math, 'Final: 11', [1], True, 5)['correct']
-    print('baseline detector and verifier checks passed')
+    from tempfile import TemporaryDirectory
+
+    with TemporaryDirectory() as directory:
+        path = Path(directory) / 'two_caps.jsonl'
+        row = {'record': 'rollout', 'mode': 'base', 'decoder': 'greedy', 'task': 'math',
+               'outcomes': {'512': {**correct, 'cap': True}, '1024': correct}}
+        path.write_text(json.dumps(row))
+        counts = {r['cap']: r['hit_cap'] for r in summarize(path)}
+        assert counts == {512: 1, 1024: 0}
+    print('baseline detector, verifier and summary checks passed')
 
 
 def main():
