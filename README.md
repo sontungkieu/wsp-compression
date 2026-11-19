@@ -208,6 +208,11 @@ factorial contrasts and one-component removals from the full tag pair.
 Use `--ablation-design punctuation` to cross the opening `[]`, closing
 brackets, and the slash at the closing site while retaining the boundary
 newlines. At that site the four conditions are empty, `/`, `[]`, and `[/]`.
+Use `--ablation-design closing-marks` to leave the opening site empty and
+compare an empty closing site with `[`, `]`, `[]`, and `()`. All five use
+the same boundary newlines and central newline-token filler at the original
+insertion length. The summary compares the square pair with each control and
+estimates the interaction of the two square-bracket characters.
 
 ## Interpretation
 

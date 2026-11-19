@@ -31,6 +31,7 @@ FRAME_ARMS = {f'{frame}_{name}': {'frame': frame == 'framed', 'filler': filler}
               for frame in ('bare', 'framed') for name, filler in FRAME_FILLERS.items()}
 FRAME_COMPONENTS = ('words', 'brackets', 'edges')
 PUNCTUATION_COMPONENTS = ('opener', 'closer', 'slash')
+CLOSING_MARKS = {'none': '', 'left_square': '[', 'right_square': ']', 'square_pair': '[]', 'round_pair': '()'}
 REPLAY_SEED = 28937
 
 
@@ -185,11 +186,15 @@ def with_frame_ablation(tokenizer, prefix, inserted_tokens):
     return result
 
 
+def newline_boundaries(opening, closing):
+    return '\n\n' + opening + '\n', '\n' + closing + '\n'
+
+
 def component_tags(*, words, brackets, edges):
     label = 'Additional context' if words else ''
     opening, closing = (f'[{label}]', f'[/{label}]') if brackets else (label, label)
     if edges:
-        return '\n\n' + opening + '\n', '\n' + closing + '\n'
+        return newline_boundaries(opening, closing)
     return opening, closing
 
 
@@ -197,7 +202,7 @@ def punctuation_tags(*, opener, closer, slash):
     opening = '[]' if opener else ''
     mark = '/' if slash else ''
     closing = f'[{mark}]' if closer else mark
-    return '\n\n' + opening + '\n', '\n' + closing + '\n'
+    return newline_boundaries(opening, closing)
 
 
 def with_newline_tags(tokenizer, prefix, inserted_tokens, tags):
@@ -222,6 +227,11 @@ def with_component_ablation(tokenizer, prefix, inserted_tokens):
 
 def with_punctuation_ablation(tokenizer, prefix, inserted_tokens):
     tags = {arm: punctuation_tags(**flags) for arm, flags in PUNCTUATION_ARMS.items()}
+    return with_newline_tags(tokenizer, prefix, inserted_tokens, tags)
+
+
+def with_closing_marks_ablation(tokenizer, prefix, inserted_tokens):
+    tags = {arm: newline_boundaries('', mark) for arm, mark in CLOSING_MARKS.items()}
     return with_newline_tags(tokenizer, prefix, inserted_tokens, tags)
 
 
@@ -265,6 +275,7 @@ def run(args, identity, selected, verified):
         'frame': (FRAME_ARMS, with_frame_ablation),
         'components': (COMPONENT_ARMS, with_component_ablation),
         'punctuation': (PUNCTUATION_ARMS, with_punctuation_ablation),
+        'closing-marks': (CLOSING_MARKS, with_closing_marks_ablation),
     }[args.ablation_design]
     parent_cases = {}
     if ablation:
@@ -393,6 +404,13 @@ def ablation_contrasts(design):
         return {f'{a}_minus_{b}': {a: 1, b: -1} for a, b in (
             ('continue', 'neutral'), ('finalize', 'neutral'), ('finalize', 'continue'))}
 
+    if design == 'closing-marks':
+        pairs = [('square_pair', control) for control in ('none', 'left_square', 'right_square', 'round_pair')]
+        pairs += [('right_square', 'left_square'), ('left_square', 'none'),
+                  ('right_square', 'none'), ('round_pair', 'none')]
+        return {**{f'{a}_minus_{b}': {a: 1, b: -1} for a, b in pairs},
+                'square_pair_interaction': {'square_pair': 1, 'left_square': -1, 'right_square': -1, 'none': 1}}
+
     if design in ('components', 'punctuation'):
         parts, design_arms = ((FRAME_COMPONENTS, COMPONENT_ARMS) if design == 'components'
                               else (PUNCTUATION_COMPONENTS, PUNCTUATION_ARMS))
@@ -508,7 +526,7 @@ def main():
     parser.add_argument('--inventory', action='store_true')
     parser.add_argument('--self-test', action='store_true')
     parser.add_argument('--ablate-note', type=Path, help='match the cohort and inserted token count of a completed Astra replay directory')
-    parser.add_argument('--ablation-design', choices=('instructions', 'frame', 'components', 'punctuation'),
+    parser.add_argument('--ablation-design', choices=('instructions', 'frame', 'components', 'punctuation', 'closing-marks'),
                         default='instructions')
     args = parser.parse_args()
     if args.self_test:
@@ -519,6 +537,9 @@ def main():
         assert select_information('We found <<36-10=26>>. #### 26', '26') is None
         assert component_tags(words=True, brackets=True, edges=True) == (CONTEXT_OPEN, CONTEXT_CLOSE)
         assert punctuation_tags(opener=True, closer=True, slash=True) == component_tags(words=False, brackets=True, edges=True)
+        for arm, bracketed in (('none', False), ('square_pair', True)):
+            assert newline_boundaries('', CLOSING_MARKS[arm]) == punctuation_tags(
+                opener=False, closer=bracketed, slash=False)
         print('exact-cycle and intermediate-information checks passed')
         return
     if args.summarize:
