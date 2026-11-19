@@ -4,6 +4,7 @@ from collections import defaultdict
 from decimal import Decimal
 import hashlib
 import inspect
+from itertools import combinations, product
 import json
 from pathlib import Path
 import random
@@ -28,6 +29,12 @@ CONTEXT_CLOSE = '\n[/Additional context]\n'
 FRAME_FILLERS = {'spaces': ' ', 'newlines': '\n', 'periods': '.'}
 FRAME_ARMS = {f'{frame}_{name}': {'frame': frame == 'framed', 'filler': filler}
               for frame in ('bare', 'framed') for name, filler in FRAME_FILLERS.items()}
+FRAME_COMPONENTS = ('words', 'brackets', 'edges')
+COMPONENT_ARMS = {
+    '_'.join(name for name, present in zip(FRAME_COMPONENTS, flags) if present) or 'none':
+    dict(zip(FRAME_COMPONENTS, flags))
+    for flags in product((False, True), repeat=len(FRAME_COMPONENTS))
+}
 REPLAY_SEED = 28937
 
 
@@ -173,6 +180,30 @@ def with_frame_ablation(tokenizer, prefix, inserted_tokens):
     return result
 
 
+def component_tags(*, words, brackets, edges):
+    label = 'Additional context' if words else ''
+    opening, closing = (f'[{label}]', f'[/{label}]') if brackets else (label, label)
+    if edges:
+        return '\n\n' + opening + '\n', '\n' + closing + '\n'
+    return opening, closing
+
+
+def with_component_ablation(tokenizer, prefix, inserted_tokens):
+    newline = tokenizer.encode('\n', add_special_tokens=False)
+    if len(newline) != 1:
+        raise ValueError('component ablation requires a single newline token')
+    result = {}
+    for arm, components in COMPONENT_ARMS.items():
+        opening, closing = component_tags(**components)
+        start = tokenizer.encode(opening, add_special_tokens=False) if opening else []
+        end = tokenizer.encode(closing, add_special_tokens=False) if closing else []
+        body = inserted_tokens - len(start) - len(end)
+        if body < 1:
+            raise ValueError('component tags exceed the parent insertion budget')
+        result[arm] = prefix + start + newline * body + end
+    return result
+
+
 def run(args, identity, selected, verified):
     import torch
     import transformers
@@ -208,7 +239,11 @@ def run(args, identity, selected, verified):
     mode = 'think' if args.astra else 'base'
     temperature, top_p, top_k = (.6, .95, 20) if args.astra else (.7, .9, 0)
     ablation = args.ablate_note is not None
-    arms, attach = (FRAME_ARMS, with_frame_ablation) if args.ablation_design == 'frame' else (NOTE_TEXT, with_matched_notes)
+    arms, attach = {
+        'instructions': (NOTE_TEXT, with_matched_notes),
+        'frame': (FRAME_ARMS, with_frame_ablation),
+        'components': (COMPONENT_ARMS, with_component_ablation),
+    }[args.ablation_design]
     parent_cases = {}
     if ablation:
         source, source_sha, parent_deadline = prior_replay(args.ablate_note)
@@ -336,6 +371,19 @@ def ablation_contrasts(design):
         return {f'{a}_minus_{b}': {a: 1, b: -1} for a, b in (
             ('continue', 'neutral'), ('finalize', 'neutral'), ('finalize', 'continue'))}
 
+    if design == 'components':
+        factorial = {}
+        for order in range(1, len(FRAME_COMPONENTS) + 1):
+            denominator = 2 ** (len(FRAME_COMPONENTS) - order)
+            for terms in combinations(FRAME_COMPONENTS, order):
+                factorial['_by_'.join(terms)] = {
+                    arm: (-1) ** sum(not flags[t] for t in terms) / denominator
+                    for arm, flags in COMPONENT_ARMS.items()}
+        full = '_'.join(FRAME_COMPONENTS)
+        drops = {f'full_minus_no_{part}': {full: 1, '_'.join(n for n in FRAME_COMPONENTS if n != part): -1}
+                 for part in FRAME_COMPONENTS}
+        return {**factorial, **drops}
+
     frame_effects = {f'frame_effect_{f}': {f'framed_{f}': 1, f'bare_{f}': -1} for f in FRAME_FILLERS}
     return {
         **frame_effects,
@@ -434,7 +482,7 @@ def main():
     parser.add_argument('--inventory', action='store_true')
     parser.add_argument('--self-test', action='store_true')
     parser.add_argument('--ablate-note', type=Path, help='match the cohort and inserted token count of a completed Astra replay directory')
-    parser.add_argument('--ablation-design', choices=('instructions', 'frame'), default='instructions')
+    parser.add_argument('--ablation-design', choices=('instructions', 'frame', 'components'), default='instructions')
     args = parser.parse_args()
     if args.self_test:
         assert terminal_cycle(list(range(7)) * 20) == (7, 35)
@@ -442,6 +490,7 @@ def main():
         assert terminal_cycle([99] + list(range(32)) * 5) == (32, 161)
         assert select_information('We found <<12*3=36>> and <<36-10=26>>. #### 26', '26') == '12*3 = 36'
         assert select_information('We found <<36-10=26>>. #### 26', '26') is None
+        assert component_tags(words=True, brackets=True, edges=True) == (CONTEXT_OPEN, CONTEXT_CLOSE)
         print('exact-cycle and intermediate-information checks passed')
         return
     if args.summarize:
@@ -462,8 +511,8 @@ def main():
         parser.error('nonzero draw offsets are for ablation shards')
     if args.ablate_note and not args.astra:
         parser.error('note ablation requires --astra')
-    if args.ablation_design == 'frame' and not args.ablate_note:
-        parser.error('frame ablation requires --ablate-note')
+    if args.ablation_design != 'instructions' and not args.ablate_note:
+        parser.error('the selected ablation design requires --ablate-note')
     if len(selected) < args.min_cases:
         raise SystemExit('too few independently verified prompts with an intermediate cue')
     run(args, identity, selected, verified)

@@ -200,6 +200,11 @@ Add `--ablation-design frame` to cross the presence of the context delimiters
 with three single-token fillers (space, newline, period). Each condition
 keeps the same total insertion length. The summary includes within-filler
 frame effects and comparisons against the period control.
+Use `--ablation-design components` to cross the tag words, bracket and slash
+punctuation, and boundary newlines. This keeps the newline token as the
+filler and adjusts only the length of the central filler to match the
+insertion budget. Tag variants are tokenized separately. This design reports
+factorial contrasts and one-component removals from the full tag pair.
 
 ## Interpretation
 
