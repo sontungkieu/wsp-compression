@@ -233,6 +233,18 @@ held-out replay across both nodes. It runs the joint swap, separate
 one-group swaps, and a longer-cap replay on a fixed 24-prompt subset.
 Each node writes its own receipts under a fresh shared run directory.
 
+`repetition_exit_queue.py` schedules a fixed, independently verified
+loop and nonlooping cohort across the two allocated B200 workspaces.
+It tunes a fixed `</think>` logit bias on the prior cohort, measures
+causal last-position residual swaps on that cohort, and gates held-out
+testing on both receipts. `repetition_exit.py` compares an unmodified
+prefix, length-matched closing-mark controls, direct probability transfer,
+constant bias, and equal-duration fixed and loop-triggered pulses.
+It reports accuracy, EOS, and exact-copy preservation separately by
+stratum. The queue ends with a larger-cap replay and tests the selected
+prefill-layer intervention with a matched-norm random control. Phase
+progress and digests are recorded separately by supervisor.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
