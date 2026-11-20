@@ -58,6 +58,7 @@ def discover_cases(path, checked_sha):
 class ExitSupervisor(Supervisor):
     def __init__(self, args):
         super().__init__(args)
+        self.src = Path(__file__).resolve().parent
         self.env["PYTHONPATH"] = f"{args.runtime}:{args.stable}:{args.mediation}:{args.overlay}"
         self.worker = self.src / "repetition_exit.py"
 
