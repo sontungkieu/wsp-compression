@@ -98,22 +98,23 @@ def motif_probe(runtime,group):
 def run(a):
     cohort = a.root/"cohort.json"
     plan = load(cohort)
+    states,arms,caps = tuple(plan.get("states",STATES)),tuple(plan.get("arms",ARMS)),tuple(plan["caps"])
     smoke = a.phase=="smoke"
     cases = plan["cases"]
     if smoke:
-        cases = [next(x for x in cases if x["state"]==s) for s in STATES]
+        cases = cases[:2] if len(states)==1 else [next(x for x in cases if x["state"]==s) for s in states]
     else:
         cases = sorted(cases,key=lambda x:(x["cut"],x["row"]["id"]))[a.part::2]
     r = Runtime(a)
     items = inputs_for(r.tokenizer,cases)
-    cap = SMOKE if smoke else CAPS[-1]
+    cap = SMOKE if smoke else caps[-1]
     partial = a.output.with_suffix(".partial.jsonl")
     if a.output.exists():
         raise FileExistsError(a.output)
     with partial.open("x") as stream,r.torch.inference_mode():
         def emit(value):
             print(json.dumps(value,allow_nan=False),file=stream,flush=True)
-        emit({"kind":"manifest","phase":a.phase,"part":a.part,"cap":cap,"arms":ARMS,
+        emit({"kind":"manifest","phase":a.phase,"part":a.part,"cap":cap,"arms":arms,
               "cohort_sha256":sha(cohort),"late_budget_worker_sha256":sha(Path(__file__)),**r.manifest})
         started = time.monotonic()
         for draw in range(1 if smoke else DRAWS):
@@ -121,10 +122,11 @@ def run(a):
                 if time.time() >= a.deadline-100:
                     raise TimeoutError("late-budget worker reached deadline")
                 group = items[i:i+BLOCK]
-                if draw==0:
+                if draw==0 and plan.get("probe_motif",True):
                     for record in motif_probe(r,group):
                         emit(record)
-                traces,audit = sample(r,group,draw,cap-1,smoke,swap_arms=(CONV,BOTH))
+                traces,audit = sample(r,group,draw,cap-1,smoke,swap_arms=tuple(a for a in (CONV,BOTH) if a in arms),
+                                       question_only=DROP in arms)
                 emit({"kind":"audit","ids":[x["row"]["id"] for x in group],"draw":draw,"cache":audit})
                 question = [x | {"no_think_ids":r.tokenizer.encode(render(r.tokenizer,x["row"],"no-think"),
                                                                   add_special_tokens=False),
@@ -134,7 +136,7 @@ def run(a):
                     raise ValueError("direct baseline did not prefill the closing marker")
                 pack = pack_at(r,[x["no_think_ids"] for x in question],width)
                 traces[DIRECT] = r.generate(question,"no_think",draw,cap,packed=pack,start_after_marker=True)
-                for arm in ARMS:
+                for arm in arms:
                     for x,record in zip(group,traces[arm],strict=True):
                         emit(record | {"arm":arm,"state":x["state"],"landmark":x["cut"],
                                        "source_prefix_sha256":packed_hash(x["completion_prefix"]),
@@ -148,8 +150,10 @@ def read_shard(path,fingerprint,cohort,phase,cases):
         raise ValueError("late-budget shard checksum changed")
     with path.open() as stream:
         head,*rows,end = map(json.loads,stream)
-    cap = SMOKE if phase=="smoke" else CAPS[-1]
-    if (head["phase"]!=phase or head["cohort_sha256"]!=sha(cohort) or tuple(head["arms"])!=ARMS
+    plan = load(cohort)
+    arms = tuple(plan.get("arms",ARMS))
+    cap = SMOKE if phase=="smoke" else plan["caps"][-1]
+    if (head["phase"]!=phase or head["cohort_sha256"]!=sha(cohort) or tuple(head["arms"])!=arms
             or head["cap"]!=cap or head["late_budget_worker_sha256"]!=sha(Path(__file__)) or end["kind"]!="complete"):
         raise ValueError("unexpected late-budget worker receipt")
     raw,probes = [],[]
@@ -165,7 +169,7 @@ def read_shard(path,fingerprint,cohort,phase,cases):
             probes.append(r)
             continue
         arm,d,p = r["arm"],r["draw"],r["id"]
-        if (r["kind"]!="rollout" or arm not in ARMS or len(tokens(r))>cap
+        if (r["kind"]!="rollout" or arm not in arms or len(tokens(r))>cap
                 or r["post_seed"]!=post_seed(p,d) or r["seed"]!=(post_seed(p,d) if arm==DIRECT else seed_for(p,d))
                 or r["landmark"]!=case["cut"] or r["render_sha256"]!=case["render_sha256"]
                 or packed_hash(case["completion_prefix"])!=r["source_prefix_sha256"]
@@ -180,6 +184,7 @@ def read_shard(path,fingerprint,cohort,phase,cases):
 def summarize(root,tokenizer):
     cohort = root/"cohort.json"
     plan = load(cohort)
+    states,arms,caps = tuple(plan.get("states",STATES)),tuple(plan.get("arms",ARMS)),tuple(plan["caps"])
     cases = {(x["row"]["id"],x["state"]):x for x in plan["cases"]}
     receipts = load(root/"queue/eval-done.json")["outputs"]
     [turn] = tokenizer.encode("<|im_end|>",add_special_tokens=False)
@@ -196,12 +201,12 @@ def summarize(root,tokenizer):
             if p["id"] in probes:
                 raise ValueError("duplicate late-budget motif probe")
             probes[p["id"]] = p
-    if (raw.keys()!={(p,s,d,a) for p,s in cases for d in range(DRAWS) for a in ARMS} or
-            set(probes)!={p for p,s in cases if s==CONFIRM}):
+    if (raw.keys()!={(p,s,d,a) for p,s in cases for d in range(DRAWS) for a in arms} or
+            set(probes)!={p for p,s in cases if s==CONFIRM and plan.get("probe_motif",True)}):
         raise ValueError("incomplete late-budget outcomes")
 
     windows = {}
-    for cap in CAPS:
+    for cap in caps:
         rows = {}
         for (p,s,d,a),r in raw.items():
             case = cases[p,s]
@@ -216,25 +221,28 @@ def summarize(root,tokenizer):
                                  "terminal_cycle":terminal_cycle(view) is not None,
                                  "original_motif":ends_in_motif(view,cycle["motif"]) if cycle else None}
         table = {}
-        for state in STATES:
+        for state in states:
             pids = [p for p,s in cases if s==state]
             metrics = ("correct_eos","eos","wrong_eos","missing_eos","cap","numeric_correct","strict_boxed",
                        "terminal_cycle","first_correct_box_token")
-            arms,delta = {},{}
-            for arm in ARMS:
+            cells,delta = {},{}
+            for arm in arms:
                 vals = [rows[p,state,d,arm] for p in pids for d in range(DRAWS)]
-                arms[arm] = {m:sum(bool(r[m]) for r in vals) for m in metrics} | {
+                cells[arm] = {m:sum(bool(r[m]) for r in vals) for m in metrics} | {
                     "original_motif":sum(r["original_motif"] for r in vals) if state==CONFIRM else None}
             for a,b in ((CONV,NATIVE),(BOTH,NATIVE),(CONV,DIRECT),(NATIVE,DIRECT),(DROP,DIRECT)):
+                if a not in arms or b not in arms:
+                    continue
                 delta[a+"-"+b] = paired_interval({p:[int(rows[p,state,d,a]["correct_eos"])-
                                                      int(rows[p,state,d,b]["correct_eos"]) for d in range(DRAWS)] for p in pids})
-            table[state] = {"prompts":len(pids),"rows_per_arm":len(pids)*DRAWS,"arms":arms,"paired_correct_eos":delta}
+            table[state] = {"prompts":len(pids),"rows_per_arm":len(pids)*DRAWS,"arms":cells,"paired_correct_eos":delta}
         windows[str(cap)] = {"summary":table,"cells":[{"id":p,"state":s,"draw":d,"arm":a,**r}
                                                      for (p,s,d,a),r in rows.items()]}
 
     mapping = {NATIVE:"keep",CONV:"swap_conv",BOTH:"swap_both",DROP:"question_only"}
-    parity = {a:{"same":0,"compared":0} for a in mapping}
-    for filename,expected in plan["source_shards"]:
+    parity = {a:{"same":0,"compared":0} for a in mapping if a in arms}
+    parity_sources = [] if plan.get("replication") else plan["source_shards"]
+    for filename,expected in parity_sources:
         path = Path(filename)
         if sha(path)!=expected:
             raise ValueError("prior 512-token comparison shard changed")
@@ -243,14 +251,41 @@ def summarize(root,tokenizer):
                 if r["kind"]!="rollout" or (r["id"],r["state"]) not in cases:
                     continue
                 for current,old in mapping.items():
-                    if r["arm"]==old:
-                        ids,eos = cut(raw[r["id"],r["state"],r["draw"],current],"total",CAPS[0])
+                    if current in parity and r["arm"]==old:
+                        ids,eos = cut(raw[r["id"],r["state"],r["draw"],current],"total",caps[0])
                         parity[current]["compared"] += 1
                         parity[current]["same"] += (ids==r["tokens"] and eos==(r["eos_token"] is not None))
-    return {"verified_shards":receipts,"cohort_sha256":sha(cohort),"worker_seconds":times,"windows":windows,
-            "motif_probes":list(probes.values()),"archived_cut512_parity":parity,
-            "source_summary_sha256":plan["source_summary_sha256"],
-            "scope":plan["scope"],"parity_note":"batch rows changed after removing the other landmarks"}
+    result = {"verified_shards":receipts,"cohort_sha256":sha(cohort),"worker_seconds":times,"windows":windows,
+              "motif_probes":list(probes.values()),"source_summary_sha256":plan["source_summary_sha256"],
+              "scope":plan["scope"]}
+    if parity_sources:
+        result.update(archived_cut512_parity=parity,parity_note="batch rows changed after removing the other landmarks")
+    if plan.get("replication"):
+        result["primary_nested_cap"] = 1024
+        result["conv_then_direct"] = fallback_policy(raw,cases,caps[-1],tokenizer,turn)
+    return result
+
+
+def fallback_policy(raw,cases,cap,tokenizer,turn):
+    """Use the remaining budget on a fresh no-thinking trajectory if conv has not stopped by 1024."""
+    switch = 1024
+    data = []
+    full_cost = {CONV:0,DIRECT:0}
+    for (p,s),case in cases.items():
+        for draw in range(DRAWS):
+            conv,direct = raw[p,s,draw,CONV],raw[p,s,draw,DIRECT]
+            full_cost[CONV] += len(tokens(conv))
+            full_cost[DIRECT] += len(tokens(direct))
+            _,conv_stopped = cut(conv,"total",switch)
+            trajectory,budget,spent = (conv,switch,0) if conv_stopped else (direct,cap-switch,switch)
+            ids,eos = cut(trajectory,"total",budget)
+            row = score_policy(case["row"],trajectory | {"tokens":ids,
+                "eos_token":trajectory["eos_token"] if eos else None},tokenizer,turn)
+            data.append({"id":p,"state":s,"draw":draw,**row,"used":spent+len(ids)+int(eos),
+                         "restarted":not conv_stopped})
+    metrics = ("correct_eos","wrong_eos","missing_eos","cap","eos","used","restarted")
+    return {"charges_before_restart":switch,"budget":cap,"rows":len(data),
+            **{m:sum(r[m] for r in data) for m in metrics},"full_arm_total_tokens":full_cost,"cells":data}
 
 
 class BudgetQueue(Supervisor):
@@ -270,12 +305,13 @@ class BudgetQueue(Supervisor):
         try:
             self.status(cohort_sha256=self.args.cohort_sha256)
             ((path,fingerprint),) = self.run_batch("smoke",[self.plan(0,"smoke")])
-            cases = {(x["row"]["id"],x["state"]):x for x in load(self.root/"cohort.json")["cases"]}
+            plan = load(self.root/"cohort.json")
+            cases = {(x["row"]["id"],x["state"]):x for x in plan["cases"]}
             data,probes,seconds = read_shard(path,fingerprint,self.root/"cohort.json","smoke",cases)
-            if len(data)!=len(ARMS)*len(STATES) or len(probes)!=1:
+            if len(data)!=len(plan.get("arms",ARMS))*2 or len(probes)!=int(plan.get("probe_motif",True)):
                 raise ValueError("late-budget canary matrix is incomplete")
             self.status("canary_passed",canary_sha256=fingerprint,canary_seconds=seconds)
-            if not self.bounded(max(1800,seconds*CAPS[-1]/SMOKE*4)):
+            if not self.bounded(max(1200,seconds*plan["caps"][-1]/SMOKE*4)):
                 self.status("budget_complete")
                 return
             for attempt in range(10):
@@ -322,7 +358,7 @@ def main():
         save(a.output,summarize(a.root,AutoTokenizer.from_pretrained(a.model,local_files_only=True)))
         return
     q = BudgetQueue(a)
-    if socket.gethostname()!=a.host or len(q.devices)!=2 or len(set(q.devices))!=2 or not q.bounded(1800):
+    if socket.gethostname()!=a.host or len(q.devices)!=2 or len(set(q.devices))!=2 or not q.bounded(1200):
         raise ValueError("unexpected late-budget allocation")
     if (sha(a.root/"cohort.json")!=a.cohort_sha256 or
             any(sha(q.worker.parent/n)!=h for n,h in load(a.source).items())):

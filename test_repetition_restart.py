@@ -6,7 +6,7 @@ from repetition_baseline import astra_instruction
 from repetition_cache_content_score import compare_values
 from repetition_cache_retention import content_pair, correctness
 from repetition_checkpoint_replay import checkpoint, checkpoint_in_step, make_panel
-from repetition_late_budget import probability_product
+from repetition_late_budget import fallback_policy, probability_product
 from repetition_late_replay import cycle_landmarks, ends_in_motif
 from repetition_mediation import presence_scores
 from repetition_phase_trace import measurements, repeated_ngram_fraction
@@ -49,6 +49,21 @@ class TestRestartBudget(unittest.TestCase):
         impossible = probability_product([1.,0.,1.])
         self.assertEqual(impossible["product"],0.)
         self.assertIsNone(impossible["log_probability"])
+
+    def test_late_fallback_charges_conv_tokens_and_does_not_restart_wrong_eos(self):
+        class FakeTokenizer:
+            def decode(self, ids, skip_special_tokens=False):
+                return "".join({THINK_END:"</think>",1:r"\boxed{17}",2:r"\boxed{16}"}[i] for i in ids)
+        p,s = "id","at_exact_confirmation"
+        case = {(p,s):{"row":{"gold":"17"}}}
+        traces = {
+            (p,s,0,"conv_only"):{"arm":"conv_only","tokens":[THINK_END,2],"eos_token":8},
+            (p,s,1,"conv_only"):{"arm":"conv_only","tokens":[THINK_END]*2048,"eos_token":None},
+            (p,s,0,"no_think"):{"arm":"no_think","tokens":[1],"eos_token":8},
+            (p,s,1,"no_think"):{"arm":"no_think","tokens":[1],"eos_token":8},
+        }
+        y = fallback_policy(traces,case,2048,FakeTokenizer(),99)
+        self.assertEqual((y["correct_eos"],y["wrong_eos"],y["restarted"],y["used"]),(1,1,1,1029))
 
     def test_retention_copy_mention_does_not_change_exact_match(self):
         class FakeTokenizer:

@@ -68,7 +68,7 @@ def freeze(parent, excluded, output):
     })
 
 
-def sample(runtime, group, draw, cap, canary, *, swap_arms=tuple(SWAP)):
+def sample(runtime, group, draw, cap, canary, *, swap_arms=tuple(SWAP), question_only=True):
     torch = runtime.torch
     group = [x | {"presence_seed_ids":[]} for x in group]
     question,donor = prefill_donor(runtime,group)
@@ -98,8 +98,9 @@ def sample(runtime, group, draw, cap, canary, *, swap_arms=tuple(SWAP)):
         audits[arm]["max_logit_change"] = (audits[arm]["logits"]-audits[NATIVE]["logits"]).abs().amax(dim=-1).tolist()
     for data in audits.values():
         data.pop("logits")
-    traces[DROP] = runtime.generate(question,"e0",draw,cap,
-                                    packed=pack_at(runtime,[x["native_ids"] for x in question],width))
+    if question_only:
+        traces[DROP] = runtime.generate(question,"e0",draw,cap,
+                                        packed=pack_at(runtime,[x["native_ids"] for x in question],width))
     return traces,audits
 
 

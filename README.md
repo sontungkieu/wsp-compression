@@ -433,6 +433,12 @@ Qwen3.5-0.8B and Qwen3.5-2B on new numeric MATH-500 questions. It selects a
 common native cap from a disjoint timing pilot and limits the separately
 reported no-thinking baseline to 4,096 tokens.
 
+`repetition_late_replication.py` freezes a held-out replay cohort only when
+the new horizon yields at least four exact cycles. Its primary outcome is
+the paired convolution refresh effect at 1,024 continuation tokens. A
+secondary policy spends the unused budget on a direct answer when the
+convolution replay reaches 1,024 tokens without EOS.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
