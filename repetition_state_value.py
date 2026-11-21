@@ -19,6 +19,7 @@ from repetition_replay import terminal_cycle
 from repetition_state_data import THINK_END, copies
 
 E_ARMS = ("native", "e0", "e32")
+EXIT_STEPS = {"e0": 0, "e32": 32, "e128": 128}
 METRICS = ("success", "numeric_correct", "exact_format", "answer_found", "eos", "terminal_cycle", "cap",
            "wrong_parsed_eos", "missing_answer_eos", "think_at_zero", "copy_exact", "eos_before_think")
 CAP = 512
@@ -151,7 +152,7 @@ class Runtime:
     def generate(self, batch, arm, draw, cap, hook=nullcontext(), bias=0., *,
                  packed=None, first_transform=None, matched_budget=False):
         no_think = arm == "no_think"
-        exit_at = 0 if arm == "e0" else 32 if arm == "e32" else None
+        exit_at = EXIT_STEPS.get(arm)
         is_copy = batch[0]["row"]["task"] == "copy"
         if any((x["row"]["task"] == "copy") != is_copy for x in batch):
             raise ValueError("copy and math require separate generation batches")

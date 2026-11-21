@@ -303,6 +303,17 @@ The optional `--norm-only` run compares directions at equal per-state
 L2 budgets set by the blank-to-bracket and native-to-bracket distances.
 It uses a separate output root and performs prefill only.
 
+`repetition_budget_cohort.py` freezes a balanced panel of native GSM8K
+states and a question-only subset before replay. `repetition_budget_run.py`
+generates native, E0, E32, and E128 trajectories and records their common
+trunks and EOS token IDs. Its two-GPU supervisor admits additional complete
+draws based on the measured wave duration and hard deadline.
+`repetition_budget_score.py` cuts the same stored trajectories at equal
+post-marker or equal total continuation budgets, counting the closing
+marker and EOS within total windows. It reports prompt-paired intervals,
+answer status and strict formatting, and can also rescore the archived
+1,536-token timing or 512-token reachability trajectories.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
