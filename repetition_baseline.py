@@ -1,14 +1,17 @@
 """Measure natural repetition and intentional copy on unmodified checkpoints."""
 import argparse
 from collections import Counter, deque
+from decimal import Decimal
 import hashlib
 import inspect
+from itertools import product
 import json
 from pathlib import Path
 import random
 import re
 import statistics
 import time
+import unicodedata
 
 CAPS = (512, 1024, 2048, 4096, 8192, 16384)
 POLICIES = {
@@ -16,11 +19,49 @@ POLICIES = {
     'sample': (True, .7, .9, 0, 0.),
     'astra': (True, .6, .95, 20, 1.5),
 }
-ASTRA_MATH = r"Please reason step by step, and put your final answer within oxed{}."
+ASTRA_MATH = r"Please reason step by step, and put your final answer within \boxed{}."
 VERIFIER_VERSION = 1
 DECIMAL = re.compile(r'[-+]?\d+(?:,\d{3})*(?:\.\d+)?')
 INTEGER_LIST = re.compile(r'\d+(?:\s*,\s*\d+)*')
 FINAL = re.compile(r'(?im)^\s*final(?: answer)?\s*:\s*([^\n]+)')
+BOXED = re.compile(r'\\boxed\{([^{}]+)\}')
+
+
+def astra_instruction(arm):
+    if arm == 'canonical':
+        return ASTRA_MATH
+    if arm == 'legacy':
+        return ASTRA_MATH.replace(r'\boxed{}', chr(8) + 'oxed{}')
+    raise ValueError('unknown Astra prompt arm')
+
+
+def validate_astra_prompt(prompt, arm):
+    controls = [ch for ch in prompt if unicodedata.category(ch) == 'Cc' and ch not in '\n\t']
+    expected = [] if arm == 'canonical' else [chr(8)]
+    if controls != expected or prompt.count(astra_instruction(arm)) != 1:
+        raise ValueError(f'unexpected control character or instruction for {arm} Astra prompt')
+    if arm == 'canonical' and (prompt.count(r'\boxed{}') != 1 or r'\\boxed{}' in prompt):
+        raise ValueError('canonical Astra prompt requires one literal boxed directive')
+
+
+def math_answer(row, text, pending_thought=True):
+    """Read a numeric boxed answer, an explicit final-answer line, or the whole answer as a number."""
+    _, closed, post = text.rpartition('</think>')
+    answer = post.strip() if closed else text.strip()
+    if '<think>' in answer or (pending_thought and not closed):
+        answer = ''
+    exact = BOXED.search(answer)
+    exact_boxed = any(DECIMAL.fullmatch(m.group(1).strip()) and not answer[m.end():].strip(' .\n\t')
+                      for m in BOXED.finditer(answer)) if exact else False
+    body = answer.replace(chr(8) + 'oxed{', r'\boxed{')
+    boxes = BOXED.findall(body)
+    finals = FINAL.findall(body)
+    explicit = boxes[-1] if boxes else finals[-1] if finals else body
+    number = explicit.strip().removesuffix('.')
+    parsed = number.replace(',', '') if DECIMAL.fullmatch(number) else None
+    return {'exact_format': exact_boxed, 'answer_found': parsed is not None,
+            'numeric_correct': parsed is not None and Decimal(parsed) == Decimal(row['gold']),
+            'parsed_answer': parsed, 'think_closed': bool(closed)}
 
 
 def sha(path):
@@ -56,7 +97,7 @@ def first_recurrent(tokens, ngram=16):
     return None
 
 
-def panel(data, count, shard, astra_math=False):
+def panel(data, count, shard, astra_math=False, astra_arm='canonical'):
     import pyarrow.parquet as pq
 
     source = pq.read_table(data).to_pylist()
@@ -66,13 +107,15 @@ def panel(data, count, shard, astra_math=False):
     if count > 32 or start + count > len(indices):
         raise ValueError('GSM8K panel outside held-out shard')
     rows = []
-    instruction = ASTRA_MATH if astra_math else 'Solve the problem. End with a line Final: followed by the numerical answer.'
+    instruction = astra_instruction(astra_arm) if astra_math else 'Solve the problem. End with a line Final: followed by the numerical answer.'
     for index in indices[start:start + count]:
         row = source[index]
         rows.append({'id': f'gsm8k:{index}', 'task': 'math',
                      'prompt': row['question'] + '\n' + instruction,
                      'boxed_answer_required': astra_math,
                      'gold': row['answer'].rsplit('####', 1)[-1].strip().replace(',', '')})
+        if astra_math:
+            rows[-1]['astra_prompt_arm'] = astra_arm
     if astra_math:
         return rows
     rng = random.Random(923311 + shard)
@@ -147,10 +190,14 @@ def assess(row, text, tokens, eos, cap, pending_thought=False):
 
 def render(tokenizer, row, mode):
     if mode == 'base':
-        return 'Problem: ' + row['prompt'] + '\nResponse:'
-    kwargs = {'enable_thinking': mode == 'think'} if mode in ('think', 'no-think') else {}
-    return tokenizer.apply_chat_template([{'role': 'user', 'content': row['prompt']}],
-                                         tokenize=False, add_generation_prompt=True, **kwargs)
+        prompt = 'Problem: ' + row['prompt'] + '\nResponse:'
+    else:
+        kwargs = {'enable_thinking': mode == 'think'} if mode in ('think', 'no-think') else {}
+        prompt = tokenizer.apply_chat_template([{'role': 'user', 'content': row['prompt']}],
+                                               tokenize=False, add_generation_prompt=True, **kwargs)
+    if arm := row.get('astra_prompt_arm'):
+        validate_astra_prompt(prompt, arm)
+    return prompt
 
 
 def score_rollout(row, text, tokens, eos, cap, tokenizer, pending_thought):
@@ -192,6 +239,7 @@ def run(args):
     import torch
     import transformers
     from transformers import AutoModelForCausalLM, AutoModelForImageTextToText, AutoTokenizer, LogitsProcessor
+    from repetition_replay import terminal_cycle
 
     if torch.cuda.device_count() != 1:
         raise RuntimeError('exactly one assigned CUDA device required')
@@ -201,6 +249,9 @@ def run(args):
         raise ValueError('GSM8K digest mismatch')
     start = time.monotonic()
     rows = panel(args.data, args.count, args.shard, args.astra_math)
+    panels = {'canonical' if args.astra_math else 'standard': rows}
+    if args.astra_legacy_audit:
+        panels['legacy'] = panel(args.data, args.count, args.shard, args.astra_math, astra_arm='legacy')
     model_type = json.loads((args.model / 'config.json').read_text())['model_type']
     pinned = {}
     loader = AutoModelForCausalLM
@@ -255,13 +306,14 @@ def run(args):
            'data': str(args.data), 'shard': args.shard, 'sample_seeds': args.sample_seeds,
            'sample_temperature': .7, 'sample_top_p': .9, 'use_model_defaults': False,
            'model_revision': manifest['model_revision'] if pinned else None,
-           'astra_math_prompt': args.astra_math,
+           'astra_math_prompt': args.astra_math, 'prompt_arms': list(panels),
            'decoder_settings': {name: dict(zip(('sample', 'temperature', 'top_p', 'top_k', 'presence_penalty'),
                                                POLICIES[name], strict=True)) for name in args.decoder}}
     with args.output.open('x', buffering=1) as log, torch.inference_mode():
         print(json.dumps(app), file=log)
         print('loaded', args.model.name, args.mode, len(rows), 'max_tokens', args.cap, flush=True)
-        for mode in args.mode:
+        for mode, prompt_arm in product(args.mode, panels):
+            rows = panels[prompt_arm]
             for decoder in args.decoder:
                 do_sample, temperature, top_p, top_k, presence = POLICIES[decoder]
                 config = transformers.GenerationConfig(
@@ -295,15 +347,50 @@ def run(args):
                             pending = mode == 'think' or prompt.rfind('<think>') > prompt.rfind('</think>')
                             results = score_rollout(row, text, tokens, stop is not None,
                                                     args.cap, tokenizer, pending)
+                            extra = {}
+                            if args.astra_math:
+                                continuation = tokens if stop is None else tokens[:-1]
+                                extra = {'prompt_arm': prompt_arm,
+                                         'render_sha256': hashlib.sha256(prompt.encode()).hexdigest(),
+                                         'terminal_cycle': terminal_cycle(continuation) is not None,
+                                         **math_answer(row, text, pending)}
                             print(json.dumps({'record': 'rollout', 'id': row['id'], 'task': row['task'],
                                               'mode': mode, 'decoder': decoder, 'draw': draw, 'text': text,
-                                              'token_ids': tokens, 'outcomes': results}, ensure_ascii=False), file=log)
-                        print(mode, decoder, draw, min(begin + args.batch, len(rows)), '/', len(rows),
+                                              'token_ids': tokens, 'outcomes': results, **extra}, ensure_ascii=False), file=log)
+                        print(mode, decoder, prompt_arm, draw, min(begin + args.batch, len(rows)), '/', len(rows),
                               'elapsed_seconds', round(time.monotonic() - start), flush=True)
         print(json.dumps({'record': 'completed', 'elapsed_seconds': time.monotonic() - start}), file=log)
 
 
 def self_test():
+    canonical = astra_instruction('canonical')
+    legacy = astra_instruction('legacy')
+    assert canonical.encode().count(bytes([92]) + b'boxed{}') == 1 and chr(8) not in canonical
+    assert legacy.count(chr(8)) == 1 and chr(8) + 'oxed{}' in legacy
+
+    class TestTemplate:
+        def apply_chat_template(self, messages, **kwargs):
+            return 'system\n' + messages[0]['content'] + '\n<think>'
+
+    template = TestTemplate()
+    for arm, instruction in (('canonical', canonical), ('legacy', legacy)):
+        row = {'prompt': 'How many?\n' + instruction, 'astra_prompt_arm': arm}
+        checked = render(template, row, 'think')
+        assert checked.count(instruction) == 1
+        try:
+            render(template, {**row, 'prompt': row['prompt'] + chr(7)}, 'think')
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('invalid rendered control character accepted')
+    g = {'gold': '42'}
+    good = math_answer(g, '</think>\n' + r'\boxed{42}')
+    old = math_answer(g, '</think>\n' + chr(8) + 'oxed{42}')
+    assert good['exact_format'] and good['numeric_correct']
+    assert not old['exact_format'] and old['numeric_correct']
+    assert math_answer(g, '</think>\nFinal answer: 42.')['numeric_correct']
+    assert not math_answer(g, '</think>\n6 times 7 is 42')['answer_found']
+    assert not math_answer(g, r'\boxed{42}')['answer_found']
     assert first_period([1, 2, 1, 2, 1, 2, 1, 2]) == (8, 2)
     assert first_period([0] * 8) == (4, 1)
     assert first_period(list(range(90))) is None
@@ -350,6 +437,7 @@ def main():
     parser.add_argument('--mode', choices=('base', 'chat', 'think', 'no-think'), action='append')
     parser.add_argument('--decoder', choices=POLICIES, action='append')
     parser.add_argument('--astra-math', action='store_true', help='use the released boxed-answer prompt on GSM8K only')
+    parser.add_argument('--astra-legacy-audit', action='store_true', help='pair canonical with the historical malformed prompt')
     parser.add_argument('--seed', type=int, default=1944)
     parser.add_argument('--sample-seeds', type=int, default=1)
     parser.add_argument('--shard', type=int, default=0)
@@ -367,6 +455,8 @@ def main():
         if min(args.count, args.batch, args.cap, args.sample_seeds) <= 0 or args.shard < 0:
             parser.error('invalid panel or generation settings')
         args.decoder = args.decoder or ['greedy', 'sample']
+        if args.astra_legacy_audit and (not args.astra_math or args.mode != ['think'] or args.decoder != ['astra']):
+            parser.error('legacy audit requires Astra math, thinking mode, and the Astra decoder')
         run(args)
 
 

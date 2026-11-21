@@ -245,6 +245,23 @@ stratum. The queue ends with a larger-cap replay and tests the selected
 prefill-layer intervention with a matched-norm random control. Phase
 progress and digests are recorded separately by supervisor.
 
+For the Astra prompt reproduction, `repetition_baseline.py` now
+validates the rendered canonical math instruction before tokenization.
+`--astra-legacy-audit` explicitly adds the historical backspace
+variant to the canonical run, using the same problem IDs and sampling
+seeds. Save both forms with the paired queue in
+`repetition_canonical_queue.py`, which reports full-panel differences
+and freezes the replay cohort from canonical traces only.
+`repetition_canonical.py` measures exact format separately from
+numeric correctness, and uses explicit boxed, labelled, or wholly
+numeric answers. It tests the matched bracket and probability-transfer
+controls, then runs the block-4 patch/forced-tag comparison when the
+canonical replay supports it. Both forced conditions process the
+generated close tag normally and receive the same post-tag budget.
+`repetition_exit_audit.py` rescores the historical rollouts using
+only the known backspace-marker repair and reports paired contrasts
+without editing the original artifacts.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.

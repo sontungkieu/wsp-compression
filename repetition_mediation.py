@@ -95,13 +95,19 @@ def processor_factory(torch, transformers, groups):
     top_p = transformers.TopPLogitsWarper(top_p=SAMPLING["top_p"])
 
     class CoupledPolicy(transformers.LogitsProcessor):
-        def __init__(self, group, width, groups_to_swap, seed):
+        def __init__(self, group, width, groups_to_swap, seed, *, row_seeds=None, force_first=None):
             self.width = width
             self.n = len(group)
             self.tensors = [torch.tensor(groups[name], device="cuda") for name in groups_to_swap]
-            self.previous = [torch.tensor(sorted(set(x["completion_prefix"])), device="cuda") for x in group]
+            self.previous = [torch.tensor(sorted(set(x["completion_prefix"])), dtype=torch.long,
+                                          device="cuda") for x in group]
             self.pending = torch.tensor([x["pending"] for x in group], device="cuda")
             self.generator = torch.Generator(device="cuda").manual_seed(seed)
+            self.row_generators = (None if row_seeds is None else
+                                   [torch.Generator(device="cuda").manual_seed(s) for s in row_seeds])
+            if self.row_generators is not None and len(self.row_generators) != self.n:
+                raise ValueError("each receiver needs exactly one random stream")
+            self.force_first = force_first
             self.first_step = None
 
         def __call__(self, ids, scores):
@@ -129,7 +135,13 @@ def processor_factory(torch, transformers, groups):
                                       dim=-1).cpu().tolist()
                     for name, token_ids in groups.items()
                 }
-            token = torch.multinomial(probabilities, 1, generator=self.generator)
+            if self.force_first is not None and history.shape[1] == 0:
+                token = ids.new_full((self.n, 1), self.force_first)
+            elif self.row_generators is None:
+                token = torch.multinomial(probabilities, 1, generator=self.generator)
+            else:
+                token = torch.stack([torch.multinomial(p, 1, generator=g)
+                                     for p, g in zip(probabilities, self.row_generators, strict=True)])
             if self.tensors:
                 token = token.repeat(2, 1)
             return torch.full_like(scores, -torch.inf).scatter_(1, token, 0.)
