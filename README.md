@@ -397,6 +397,12 @@ identical input and produces an identical trace for each value pair.
 value with correct EOS for the opposite value, so an identical lucky guess
 credits neither cache treatment nor the question-only reference.
 
+`repetition_astra_source_reader.py` crosses base and Astra scratchpads with
+base and Astra readers under the same forced closing token and residual
+budget. It freezes eligibility at each landmark, checks identical-source
+response parity, and separates the scratchpad source effect from the reader
+checkpoint effect.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
