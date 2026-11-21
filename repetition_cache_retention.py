@@ -4,6 +4,7 @@ import hashlib
 import itertools
 import json
 from pathlib import Path
+import re
 import socket
 import subprocess
 import sys
@@ -126,14 +127,19 @@ def correctness(example, row, tokenizer):
         answer = tokenizer.decode(row["tokens"][1:],skip_special_tokens=False)
         value = answer.strip()
         correct = value==example["gold"]
+        expected_word = example["gold"].split()[0]
+        mentions_value = re.search(r"\b"+re.escape(expected_word)+r"\b",answer) is not None
     else:
         text = tokenizer.decode(row["tokens"],skip_special_tokens=False)
         answer = text.rpartition("</think>")[-1]
         assessed = math_answer(example,text)
         value,correct = assessed["parsed_answer"],assessed["numeric_correct"]
     eos = row["eos_token"] is not None
-    return {"correct":correct,"correct_eos":correct and eos,"eos":eos,
-            "abstained":answer.strip().upper()=="UNKNOWN","value":value}
+    assessed = {"correct":correct,"correct_eos":correct and eos,"eos":eos,
+                "abstained":answer.strip().upper()=="UNKNOWN","value":value}
+    if example["task"]=="copy":
+        assessed["mentions_value_eos"] = mentions_value and eos
+    return assessed
 
 
 def read_receipts(root,paths,phase,tokenizer):
@@ -188,6 +194,8 @@ def report(root,paths,phase,tokenizer):
             table[arm]={"trajectories":len(group),"pairs":len(ids)*draws,"both_values_correct_eos":both,
                         "prediction_changed":changed,**{m:sum(r[m] for r in group) for m in
                                                        ("correct","correct_eos","eos","abstained")}}
+            if task=="copy":
+                table[arm]["mentions_value_eos"] = sum(r["mentions_value_eos"] for r in group)
             table[arm]["paired_both_values_minus_raw"]=paired_interval({
                 p:[int(pair(p,d,arm))-int(pair(p,d,NATIVE)) for d in range(draws)] for p in ids})
         output[task]={"prompts":len(ids),"cells":table}
@@ -219,11 +227,17 @@ class RetentionQueue(Supervisor):
     def supervise(self):
         try:
             self.status(cohort_sha256=self.args.cohort_sha256)
-            (out,fingerprint),=self.run_batch("canary",[self.plan(0,"smoke",0,"copy")])
-            save(self.lane/"smoke-done.json",{"outputs":[[str(out),fingerprint]]})
+            if self.args.canary_receipt is not None:
+                receipt = load(self.args.canary_receipt)
+                self.status("reusing_canary",canary_receipt_sha256=self.args.canary_receipt_sha256)
+            else:
+                (out,fingerprint),=self.run_batch("canary",[self.plan(0,"smoke",0,"copy")])
+                receipt = {"outputs":[[str(out),fingerprint]]}
+            save(self.lane/"smoke-done.json",receipt)
             canary,cells=self.score("smoke")
             for task in TASKS:
-                if not cells["tasks"][task]["cells"][NATIVE]["both_values_correct_eos"]:
+                arms=cells["tasks"][task]["cells"]
+                if arms[NATIVE]["correct_eos"]<=arms[DROP]["correct_eos"]:
                     self.status("canary_floor",canary_sha256=sha(canary),floor_task=task)
                     return
             self.status("canary_passed",canary_sha256=sha(canary))
@@ -252,9 +266,9 @@ def main():
     p.add_argument("action",choices=("run","score","launch","supervise"))
     p.add_argument("--phase",choices=("smoke","eval"))
     p.add_argument("--task",choices=TASKS)
-    for name in ("root","model","data","output","overlay","stable","source"):
+    for name in ("root","model","data","output","overlay","stable","source","canary-receipt"):
         p.add_argument("--"+name,type=Path)
-    for name in ("runtime-path","devices","host","cohort-sha256"):
+    for name in ("runtime-path","devices","host","cohort-sha256","canary-receipt-sha256"):
         p.add_argument("--"+name)
     p.add_argument("--draw",type=int,default=0)
     p.add_argument("--deadline",type=int)
@@ -277,6 +291,8 @@ def main():
     if (sha(a.root/"cohort.json")!=a.cohort_sha256
             or any(sha(q.worker.parent/n)!=h for n,h in load(a.source).items())):
         raise ValueError("retention source or cohort hash changed")
+    if a.canary_receipt is not None and sha(a.canary_receipt)!=a.canary_receipt_sha256:
+        raise ValueError("the retained canary receipt changed")
     if a.action=="supervise":
         q.supervise()
         return

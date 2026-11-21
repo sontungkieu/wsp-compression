@@ -4,7 +4,8 @@ from unittest.mock import patch
 
 from repetition_baseline import astra_instruction
 from repetition_cache_content_score import compare_values
-from repetition_cache_retention import content_pair
+from repetition_cache_retention import content_pair, correctness
+from repetition_late_replay import cycle_landmarks, ends_in_motif
 from repetition_mediation import presence_scores
 from repetition_phase_trace import measurements, repeated_ngram_fraction
 from repetition_restart import nested_restart, output_row, reaches_switch, score_policy
@@ -22,6 +23,31 @@ def result(ids, eos=None):
 
 
 class TestRestartBudget(unittest.TestCase):
+    def test_retrospective_onset_aligns_whole_motif_to_confirmation(self):
+        lead = list(range(200,210))
+        cycle = [1,2,3,4,5,6,7]
+        ids = lead+cycle*20
+        actual = cycle_landmarks(ids,len(lead)+128)
+        self.assertEqual(actual["retrospective_start"],10)
+        self.assertEqual(actual["whole_period_start"],12)
+        self.assertEqual(actual["motif"],[3,4,5,6,7,1,2])
+        with self.assertRaises(ValueError):
+            cycle_landmarks(ids,len(lead)+129)
+
+    def test_original_motif_requires_sustained_repetition_after_marker(self):
+        self.assertTrue(ends_in_motif([8,9,7]*44,[7,8,9]))
+        self.assertFalse(ends_in_motif([8,9,7]*42,[7,8,9]))
+        self.assertFalse(ends_in_motif([8,9,10]*44,[7,8,9]))
+
+    def test_retention_copy_mention_does_not_change_exact_match(self):
+        class FakeTokenizer:
+            def decode(self, ids, skip_special_tokens=False):
+                return "".join(chr(i) for i in ids)
+        example = {"task":"copy","gold":"zingo zingo zingo"}
+        result = correctness(example,{"tokens":[THINK_END,*map(ord,"zingo")],"eos_token":3},FakeTokenizer())
+        self.assertFalse(result["correct_eos"])
+        self.assertTrue(result["mentions_value_eos"])
+
     def test_content_sensitivity_cancels_a_lucky_identical_guess(self):
         case = {"task":"math","variants":{"plus":{"row":{"gold":"38"}},"minus":{"row":{"gold":"48"}}}}
         first = {"value":"38.0","eos":True}

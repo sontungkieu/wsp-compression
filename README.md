@@ -387,12 +387,18 @@ Its switch analysis uses only tokens available at the fixed switch point.
 `repetition_native_horizon.py` chooses a long rollout cap for 12 fixed
 questions after a separate timing pilot and scores nested windows from
 2,048 tokens up to the selected 16,384- or 32,768-token horizon.
+`repetition_late_replay.py` freezes two cut points per still-open trace
+and compares native continuation, forced closure, convolution-only refresh,
+joint recurrent-state refresh, and question-only restart. It charges the
+marker and EOS to one continuation budget and audits the original motif at
+the end of each continuation, along with the marker's sampling probability.
 
 `repetition_cache_retention.py` changes one checkpoint value in a
 token-length-matched synthetic scratchpad while holding the question fixed.
 It measures whether each cache treatment tracks both values in exact copy
 and arithmetic, and verifies that the question-only reference sees an
 identical input and produces an identical trace for each value pair.
+The copy report includes an EOS diagnostic for a correctly mentioned nonce.
 `repetition_cache_content_score.py` contrasts correct EOS for the observed
 value with correct EOS for the opposite value, so an identical lucky guess
 credits neither cache treatment nor the question-only reference.
