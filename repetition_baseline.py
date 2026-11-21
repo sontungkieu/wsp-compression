@@ -97,18 +97,26 @@ def first_recurrent(tokens, ngram=16):
     return None
 
 
-def panel(data, count, shard, astra_math=False, astra_arm='canonical'):
+def panel(data, count, shard, astra_math=False, astra_arm='canonical', *, explicit_ids=None):
     import pyarrow.parquet as pq
 
     source = pq.read_table(data).to_pylist()
-    indices = list(range(len(source)))
-    random.Random(655231).shuffle(indices)
-    start = shard * 32
-    if count > 32 or start + count > len(indices):
-        raise ValueError('GSM8K panel outside held-out shard')
+    if explicit_ids is None:
+        indices = list(range(len(source)))
+        random.Random(655231).shuffle(indices)
+        start = shard * 32
+        if count > 32 or start + count > len(indices):
+            raise ValueError('GSM8K panel outside held-out shard')
+        indices = indices[start:start + count]
+    else:
+        lookup = {f'gsm8k:{index}': index for index in range(len(source))}
+        if (not astra_math or not 1 <= count <= 32 or len(set(explicit_ids)) != count
+                or len(explicit_ids) != count or not set(explicit_ids).issubset(lookup)):
+            raise ValueError('invalid explicit canonical GSM8K IDs')
+        indices = [lookup[x] for x in explicit_ids]
     rows = []
     instruction = astra_instruction(astra_arm) if astra_math else 'Solve the problem. End with a line Final: followed by the numerical answer.'
-    for index in indices[start:start + count]:
+    for index in indices:
         row = source[index]
         rows.append({'id': f'gsm8k:{index}', 'task': 'math',
                      'prompt': row['question'] + '\n' + instruction,
@@ -248,7 +256,8 @@ def run(args):
     if data_sha != manifest['artifacts'][args.data.name]['sha256']:
         raise ValueError('GSM8K digest mismatch')
     start = time.monotonic()
-    rows = panel(args.data, args.count, args.shard, args.astra_math)
+    explicit_ids = json.loads(args.panel_manifest.read_text())['ids'] if args.panel_manifest is not None else None
+    rows = panel(args.data, args.count, args.shard, args.astra_math, explicit_ids=explicit_ids)
     panels = {'canonical' if args.astra_math else 'standard': rows}
     if args.astra_legacy_audit:
         panels['legacy'] = panel(args.data, args.count, args.shard, args.astra_math, astra_arm='legacy')
@@ -309,6 +318,8 @@ def run(args):
            'astra_math_prompt': args.astra_math, 'prompt_arms': list(panels),
            'decoder_settings': {name: dict(zip(('sample', 'temperature', 'top_p', 'top_k', 'presence_penalty'),
                                                POLICIES[name], strict=True)) for name in args.decoder}}
+    if args.panel_manifest is not None:
+        app['panel_manifest_sha256'] = sha(args.panel_manifest)
     with args.output.open('x', buffering=1) as log, torch.inference_mode():
         print(json.dumps(app), file=log)
         print('loaded', args.model.name, args.mode, len(rows), 'max_tokens', args.cap, flush=True)
@@ -441,6 +452,7 @@ def main():
     parser.add_argument('--seed', type=int, default=1944)
     parser.add_argument('--sample-seeds', type=int, default=1)
     parser.add_argument('--shard', type=int, default=0)
+    parser.add_argument('--panel-manifest', type=Path)
     parser.add_argument('--count', type=int, default=32)
     parser.add_argument('--batch', type=int, default=8)
     parser.add_argument('--cap', type=int, default=2048)
@@ -457,6 +469,8 @@ def main():
         args.decoder = args.decoder or ['greedy', 'sample']
         if args.astra_legacy_audit and (not args.astra_math or args.mode != ['think'] or args.decoder != ['astra']):
             parser.error('legacy audit requires Astra math, thinking mode, and the Astra decoder')
+        if args.panel_manifest and (not args.astra_math or args.astra_legacy_audit):
+            parser.error('an explicit panel is supported for canonical Astra math')
         run(args)
 
 

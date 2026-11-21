@@ -90,6 +90,15 @@ def transfer_masses(receiver, donor, groups, torch):
     return torch.where(kept, receiver - receiver_rest + donor_rest, target)
 
 
+def presence_ids(item):
+    ids = item["presence_seed_ids"] if "presence_seed_ids" in item else item["completion_prefix"]
+    return sorted(set(ids))
+
+
+def presence_scores(logits, seen):
+    return (logits.float() - SAMPLING["presence_penalty"] * seen) / SAMPLING["temperature"]
+
+
 def processor_factory(torch, transformers, groups):
     top_k = transformers.TopKLogitsWarper(top_k=SAMPLING["top_k"])
     top_p = transformers.TopPLogitsWarper(top_p=SAMPLING["top_p"])
@@ -99,8 +108,7 @@ def processor_factory(torch, transformers, groups):
             self.width = width
             self.n = len(group)
             self.tensors = [torch.tensor(groups[name], device="cuda") for name in groups_to_swap]
-            self.previous = [torch.tensor(sorted(set(x["completion_prefix"])), dtype=torch.long,
-                                          device="cuda") for x in group]
+            self.previous = [torch.tensor(presence_ids(x), dtype=torch.long, device="cuda") for x in group]
             self.pending = torch.tensor([x["pending"] for x in group], device="cuda")
             self.generator = torch.Generator(device="cuda").manual_seed(seed)
             self.row_generators = (None if row_seeds is None else
@@ -111,21 +119,25 @@ def processor_factory(torch, transformers, groups):
             self.first_step = None
             self.first_transform = None
 
-        def __call__(self, ids, scores):
-            history = ids[:self.n, self.width:]
+        def seen_mask(self, history, scores):
             seen = torch.zeros_like(scores[:self.n], dtype=torch.bool)
             seen.scatter_(1, history, True)
             for index, prior in enumerate(self.previous):
                 seen[index, prior] = True
+            return seen
+
+        def __call__(self, ids, scores):
+            history = ids[:self.n, self.width:]
+            seen = self.seen_mask(history, scores)
             if self.tensors:
                 base, donor = scores.float().split(self.n, dim=0)
-                base = (base - 1.5 * seen) / .6
-                donor = (donor - 1.5 * seen) / .6
+                base = presence_scores(base, seen)
+                donor = presence_scores(donor, seen)
                 active = self.pending & ~(history == groups["think"][0]).any(dim=-1)
                 mixed = transfer_masses(base, donor, self.tensors, torch)
                 result = torch.where(active[:, None], mixed, base)
             else:
-                base = result = (scores.float() - 1.5 * seen) / .6
+                base = result = presence_scores(scores, seen)
             sampled = top_p(ids[:self.n], top_k(ids[:self.n], result))
             probabilities = sampled.softmax(dim=-1)
             if self.first_step is None:

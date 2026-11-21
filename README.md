@@ -318,6 +318,18 @@ stratum. The supervisor uses that manifest for one paired E0/E128 draw at
 3,072 post-marker tokens, and the scorer evaluates nested 2,048 and 3,072
 cuts on those same trajectories.
 
+`repetition_scratchpad_cohort.py` audits prior GSM8K IDs, allocates disjoint
+canonical discovery panels when needed, and freezes exact source scratchpads.
+`repetition_scratchpad_queue.py` runs discovery and four paired E0 draws on
+the frozen panel. A 2×2 intervention keeps or drops the context suffix
+independently of the sampler's initial presence set. In the dropped-context
+arm the preserved set conditions only the sampler. All arms keep the same
+presence penalty on newly generated tokens, the same post-marker seed, and
+the same padded width per batch.
+`repetition_scratchpad_score.py` verifies the per-arm hashes and reports
+numeric correctness with EOS from nested 256- and 512-token windows, with
+prompt-paired contrasts and the factorial interaction.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
