@@ -221,7 +221,11 @@ def phase_input(root, phase):
         choice = load(plan)["copy_selection"]
         return copies("test", choice["repetitions"]), tuple(choice["arms"]), 192, 2, sha(plan)
     cohort = root / "cohort.json"
-    return load(cohort)[phase.removeprefix("labels-")], E_ARMS, CAP, 4, sha(cohort)
+    contract = load(cohort)
+    cap = contract.get("labels_cap", CAP)
+    if type(cap) is not int or not CAP <= cap <= 2048:
+        raise ValueError("timing sensitivity cap must be between 512 and 2048")
+    return contract[phase.removeprefix("labels-")], E_ARMS, cap, 4, sha(cohort)
 
 
 def delivery_header(runtime, args, rows, arms, cap, draws, total, source):

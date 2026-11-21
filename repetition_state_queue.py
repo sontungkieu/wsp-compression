@@ -55,6 +55,10 @@ class StateQueue(Supervisor):
                 test = (self.root / "copy-test-summary.json").is_file()
                 self.status("completed" if test else "copy_dev_only")
                 return
+            if self.args.eval_and_copy:
+                evaluated = self.stage("labels-eval", max_reserve=900)
+                self.status("completed" if evaluated else "partial_deadline")
+                return
             self.stage("labels-dev", max_reserve=900)
             marker = self.src / "rank-ready.json"
             wait_until = min(self.args.deadline - 900, time.time() + 180)
@@ -86,7 +90,9 @@ def main():
     p.add_argument("--devices", required=True)
     p.add_argument("--cohort-sha256", required=True)
     p.add_argument("--worker-sha256", required=True)
-    p.add_argument("--copy-only", action="store_true")
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("--copy-only", action="store_true")
+    mode.add_argument("--eval-and-copy", action="store_true")
     args = p.parse_args()
     q = StateQueue(args)
     if (socket.gethostname() != HOST or len(set(q.devices)) != 2

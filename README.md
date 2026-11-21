@@ -283,7 +283,9 @@ All-token hooks and transient BF16 edits are gated on held-out success
 and checked against parity and a matched random edit. The supervisor
 `repetition_state_queue.py` records worker receipts and enforces its
 deadline. Its `--copy-only` mode runs copy calibration and held-out
-copy generation under a fresh output root.
+copy generation under a fresh output root. To test sensitivity to the
+timing cap, freeze an eval-only cohort with a `labels_cap` between 512
+and 2048, run the timing smoke on that cohort, and use `--eval-and-copy`.
 
 ## Interpretation
 
