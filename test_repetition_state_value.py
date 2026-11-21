@@ -1,10 +1,12 @@
 """Scorer and boundary regression checks without a model or GPU."""
+import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from repetition_state_data import THINK_END
-from repetition_state_value import generated_span, phase_input
+from repetition_state_value import METRICS, generated_span, phase_input, summarize
 
 
 class GeneratedSpanTest(unittest.TestCase):
@@ -35,6 +37,20 @@ class TimingCapTest(unittest.TestCase):
             cohort.write_text('{"eval": [], "labels_cap": 0}')
             with self.assertRaises(ValueError):
                 phase_input(root, "labels-eval")
+
+    def test_forced_close_arm_does_not_require_a_delayed_close_arm(self):
+        fields = dict.fromkeys(METRICS, False) | {
+            "think_step": None, "after_think_tokens": None, "forced_step": None,
+        }
+        matrix = ({"draws": 1, "arms": ["native", "e0"]},
+                  {"p": {"stratum": "loop", "length": 800}},
+                  {("p", 0, "native"): fields, ("p", 0, "e0"): fields | {"success": True}})
+        with tempfile.TemporaryDirectory() as directory, patch("repetition_state_value.read_matrix", return_value=matrix):
+            root = Path(directory)
+            summarize(root, "replay", (("e0", "native"),))
+            result = json.loads((root / "replay-summary.json").read_text())
+            self.assertNotIn("labels", result)
+            self.assertEqual(result["strata"]["all"]["paired"]["e0_minus_native"]["success"]["delta_pp"], 100.)
 
 
 if __name__ == "__main__":

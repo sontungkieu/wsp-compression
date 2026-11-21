@@ -324,6 +324,7 @@ def summarize(root, phase, pairs=()):
     contract, cases, rows = read_matrix(root, phase)
     draws = range(contract["draws"])
     arms = contract["arms"]
+    timing_pair = {"e0", "e32"}.issubset(arms)
     strata = {"all": list(cases)}
     for key, item in cases.items():
         strata.setdefault(item["stratum"], []).append(key)
@@ -332,7 +333,7 @@ def summarize(root, phase, pairs=()):
             length_bin = "lt_1024" if n < 1024 else "1024_3071" if n < 3072 else "gte_3072"
             strata.setdefault(length_bin, []).append(key)
     output = {"protocol": contract, "rows": len(rows), "strata": {}}
-    if not pairs and "e0" in arms:
+    if not pairs and timing_pair:
         pairs = (("e0", "e32"), ("e0", "native"), ("e32", "native"))
     for label, keys in strata.items():
         cells = {}
@@ -348,7 +349,7 @@ def summarize(root, phase, pairs=()):
             for a, b in pairs}
         output["strata"][label] = {"prompts": len(keys), "per_arm": len(keys) * len(draws),
                                    "arms": cells, "paired": contrasts}
-    if "e0" in arms:
+    if timing_pair:
         endpoints = {}
         for p in cases:
             advantage = statistics.fmean(int(rows[p, d, "e0"]["success"]) - int(rows[p, d, "e32"]["success"])
