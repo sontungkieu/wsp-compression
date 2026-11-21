@@ -43,9 +43,30 @@ def prepare(baseline, state, reach, output):
                       "length_summary": manifest["length_summary"]}))
 
 
+def prepare_extension(source, output):
+    base = load(source)
+    chosen = []
+    for group in STRATA:
+        candidates = sorted((r for r in base["cases"] if r["stratum"] == group),
+                            key=lambda r: keyed(r["row"]["id"], "timing-budget-v1:3072"))
+        chosen.extend(candidates[:8])
+    if len(chosen) != 24 or output.exists():
+        raise ValueError("expected 24 frozen extension cases and a fresh output path")
+    chosen.sort(key=lambda r: keyed(r["row"]["id"], "timing-budget-v1:3072-order"))
+    save(output, {**base, "version": "timing-budget-extension-v1", "cases": chosen, "question_only": [],
+                  "parent_cohort_sha256": sha(source), "length_summary": length_summary(chosen)})
+    print(json.dumps({"cohort_sha256": sha(output), "n": len(chosen)}))
+
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     for name in ("baseline", "state", "reach", "output"):
-        p.add_argument("--" + name, type=Path, required=True)
+        p.add_argument("--" + name, type=Path, required=(name=="output"))
+    p.add_argument("--extend-from", type=Path)
     a = p.parse_args()
-    prepare(a.baseline, a.state, a.reach, a.output)
+    if a.extend_from is not None:
+        prepare_extension(a.extend_from, a.output)
+    elif all((a.baseline, a.state, a.reach)):
+        prepare(a.baseline, a.state, a.reach, a.output)
+    else:
+        p.error("provide either the three archive roots or an existing cohort to extend")

@@ -15,6 +15,7 @@ from repetition_state_queue import HOST
 from repetition_state_value import EXIT_STEPS, Runtime, THINK_END, inputs_for, post_seed
 
 ARMS = ("native", "e0", "e32", "e128")
+EXTENDED_ARMS = ("e0", "e128")
 QUESTION = "question_e0"
 CAP = 1536
 BATCH_SIZE = 15
@@ -29,6 +30,8 @@ def tokens(row):
 def common_trunk(arms, total_native_cap):
     checks = {}
     for a, b, fork in (("e32", "e128", 32), ("native", "e32", 32), ("native", "e128", 128)):
+        if a not in arms or b not in arms:
+            continue
         x, y = arms[a], arms[b]
         n = min(fork, total_native_cap) if a == "native" else fork
         checks[a + ":" + b] = {"before_fork": tokens(x)[:n] == tokens(y)[:n], "matched_post": None}
@@ -48,21 +51,23 @@ def packed_hash(ids):
 def run(args):
     cohort_path = args.root / "cohort.json"
     plan = load(cohort_path)
+    extending = plan["version"] == "timing-budget-extension-v1"
+    arms = EXTENDED_ARMS if extending else ARMS
     rows = plan["cases"][args.part::args.partitions]
     question = set(plan["question_only"])
-    cap = args.cap
+    cap = 3072 if extending else args.cap
     if args.action == "smoke":
         # Use short, medium and long prefixes and run question-only on each.
         ordered = sorted(plan["cases"], key=lambda x: len(x["completion_prefix"]))
         rows = [ordered[0], ordered[len(ordered)//2], ordered[-1]]
-        question = {x["row"]["id"] for x in rows}
+        question = set() if extending else {x["row"]["id"] for x in rows}
         cap = 12
     r = Runtime(args)
     items = inputs_for(r.tokenizer, rows)
     thin = inputs_for(r.tokenizer, [x | {"completion_prefix": []} for x in rows if x["row"]["id"] in question])
     header = {"kind": "manifest", "wave": args.wave, "part": args.part, "partitions": args.partitions,
               "native_total_cap": cap, "forced_post_cap": cap, "draw": args.wave,
-              "thresholds": EXIT_STEPS, "base_commit": BASE_COMMIT, "batch_size": BATCH_SIZE,
+              "thresholds": EXIT_STEPS, "arms": arms, "base_commit": BASE_COMMIT, "batch_size": BATCH_SIZE,
               "cohort_sha256": sha(cohort_path), "budget_worker_sha256": sha(Path(__file__)),
               "cases": [{"id": x["row"]["id"], "stratum": x["stratum"], "eval_origin": x["eval_origin"],
                          "length": len(x["completion_prefix"]), "render_sha256": x["render_sha256"],
@@ -78,7 +83,7 @@ def run(args):
             batch = items[begin:begin+BATCH_SIZE]
             packed = r.pack([x["native_ids"] for x in batch])
             per_arm = {}
-            for arm in ARMS:
+            for arm in arms:
                 if time.time() >= args.deadline - 45:
                     raise TimeoutError("timing-budget worker deadline")
                 per_arm[arm] = r.generate(batch, arm, args.wave, cap, packed=packed)
@@ -104,8 +109,9 @@ def verify_smoke(root, cohort_sha):
             or h["forced_post_cap"] != 12 or end["kind"] != "complete"):
         raise ValueError("incorrect smoke protocol")
     generated = [x for x in rows if x["kind"]=="rollout"]
-    if len(generated)!=15:
-        raise ValueError("canary did not complete the five-arm matrix")
+    expected = 3 * len(h.get("arms", ARMS)) + len(h["question_only"])
+    if len(generated)!=expected:
+        raise ValueError("canary did not complete its arm matrix")
     for r in generated:
         arm, t = r["arm"], r["think_step"]
         if r["seed"] != seed_for(r["id"],0) or r["post_seed"] != post_seed(r["id"],0):
@@ -132,10 +138,12 @@ class BudgetQueue(Supervisor):
     def supervise(self):
         try:
             self.status("admitted", cohort_sha256=digest(self.root/"cohort.json"), completed_draws=[])
-            for draw in range(TARGET_DRAWS):
+            extending = load(self.root/"cohort.json")["version"] == "timing-budget-extension-v1"
+            for draw in range(1 if extending else TARGET_DRAWS):
                 remaining = self.args.deadline-time.time()
                 elapsed = self.state.get("last_draw_seconds")
-                if remaining < (300 if elapsed is None else 1.12*elapsed+75):
+                minimum = (225 if extending else 300) if elapsed is None else 1.12*elapsed+75
+                if remaining < minimum:
                     self.status("budget_complete", cutoff_reason="insufficient time for a full paired draw")
                     return
                 phase = f"draw{draw}"

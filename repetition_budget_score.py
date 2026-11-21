@@ -6,7 +6,7 @@ from pathlib import Path
 import statistics
 
 from repetition_baseline import math_answer, sha
-from repetition_budget_run import ARMS, QUESTION
+from repetition_budget_run import ARMS, EXTENDED_ARMS, QUESTION
 from repetition_canonical import score, seed_for
 from repetition_canonical_queue import paired_interval
 from repetition_mediation_queue import load, save
@@ -49,6 +49,7 @@ def assess_window(row, record, basis, budget, tokenizer, chat_end):
 def load_budget(root):
     cohort_path = root/"cohort.json"
     manifest = load(cohort_path)
+    arms = EXTENDED_ARMS if manifest["version"]=="timing-budget-extension-v1" else ARMS
     cases = {x["row"]["id"]: x for x in manifest["cases"]}
     source = sha(cohort_path)
     expected_question = set(manifest["question_only"])
@@ -67,7 +68,8 @@ def load_budget(root):
             receipts.append([str(p),digest])
             with p.open() as f:
                 h = json.loads(next(f))
-                if h["cohort_sha256"]!=source or h["wave"]!=wave or h["part"] in parts or h["draw"]!=wave:
+                if (h["cohort_sha256"]!=source or h["wave"]!=wave or h["part"] in parts or h["draw"]!=wave
+                        or tuple(h.get("arms", ARMS))!=arms):
                     raise ValueError("wrong cohort or draw")
                 parts.add(h["part"])
                 part_ids = {x["id"] for x in h["cases"]}
@@ -101,7 +103,7 @@ def load_budget(root):
                     raise ValueError("missing timing completion footer")
         if parts!={0,1} or wave_cases!=set(cases) or expected_question!=question:
             raise ValueError("incomplete paired prompt coverage")
-    expected = {(p,d,a) for p in cases for d in range(len(ready)) for a in (*ARMS,QUESTION)
+    expected = {(p,d,a) for p in cases for d in range(len(ready)) for a in (*arms,QUESTION)
                 if a!=QUESTION or p in expected_question}
     if raw.keys()!=expected or set(trunks)!={(p,d) for p,d,_ in expected}:
         raise ValueError("incomplete rollout/trunk matrix")
@@ -183,7 +185,8 @@ def main():
     tok = AutoTokenizer.from_pretrained(args.model,local_files_only=True)
     if args.mode == "budget":
         data = load_budget(args.root)
-        horizons, totals = POST,TOTAL
+        extending = load(args.root/"cohort.json")["version"] == "timing-budget-extension-v1"
+        horizons, totals = ((*POST,2048,3072),(*TOTAL,2048,3072)) if extending else (POST,TOTAL)
     else:
         data = load_archive(args.root,"labels-eval" if args.mode=="archive1536" else "replay")
         horizons, totals = (POST,(256,*TOTAL)) if args.mode=="archive1536" else ((256,512),(256,512))

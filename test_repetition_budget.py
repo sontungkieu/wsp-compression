@@ -1,6 +1,10 @@
 """Regression cases for nested limits and common-prefix verification."""
+import json
+from pathlib import Path
+import tempfile
 import unittest
 
+from repetition_budget_cohort import prepare_extension
 from repetition_budget_run import common_trunk
 from repetition_budget_score import cut
 from repetition_state_data import THINK_END
@@ -42,6 +46,23 @@ class TrunkTest(unittest.TestCase):
         native = replay([1, THINK_END, 2], close=1)
         checks = common_trunk({"e32": short, "e128": short, "native": native}, 3)
         self.assertTrue(all(v["before_fork"] and v["matched_post"] for v in checks.values()))
+
+
+class ExtensionTest(unittest.TestCase):
+    def test_extension_is_balanced_and_deterministic(self):
+        cases = [{"row": {"id": f"{g}:{i}"}, "stratum": g, "completion_prefix": [1, 2]}
+                 for g in ("loop", "pre_onset", "progress") for i in range(20)]
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source.json"
+            source.write_text(json.dumps({"cases": cases}))
+            first, second = (source.with_name(name) for name in ("a.json", "b.json"))
+            prepare_extension(source, first)
+            prepare_extension(source, second)
+            self.assertEqual(first.read_bytes(), second.read_bytes())
+            out = json.loads(first.read_text())
+        self.assertEqual(out["question_only"], [])
+        self.assertEqual({g: v["n"] for g, v in out["length_summary"].items()},
+                         {"loop": 8, "pre_onset": 8, "progress": 8})
 
 
 if __name__ == "__main__":

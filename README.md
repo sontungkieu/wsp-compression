@@ -313,6 +313,10 @@ post-marker or equal total continuation budgets, counting the closing
 marker and EOS within total windows. It reports prompt-paired intervals,
 answer status and strict formatting, and can also rescore the archived
 1,536-token timing or 512-token reachability trajectories.
+An extension manifest prepared with `--extend-from` freezes eight IDs per
+stratum. The supervisor uses that manifest for one paired E0/E128 draw at
+3,072 post-marker tokens, and the scorer evaluates nested 2,048 and 3,072
+cuts on those same trajectories.
 
 ## Interpretation
 
