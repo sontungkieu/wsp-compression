@@ -24,6 +24,10 @@ NATURAL, DIRECT = "native_thinking", "no_think"
 REPLAY = (NATIVE,CONV,BOTH,DROP)
 CHECKPOINT_LINE = re.compile(r"^\s*State[ \t]+3[ \t]*=[ \t]*(-?[0-9]+)[ \t]*(?=\n)",re.I|re.M)
 LATER_LINE = re.compile(r"^\s*State[ \t]+[456][ \t]*=",re.I|re.M)
+STEP_TITLE = re.compile(r"(?:Step|Operation|Op)[ \t]+([1-6])(?=[\s.:*)-]|$)",re.I)
+STATE_TITLE = re.compile(r"State[ \t]+([1-6])[ \t]*(?:=|:)",re.I)
+RECORD_TITLE = re.compile(r"(?:Record|Line|Format)[ \t]*:[ \t]*",re.I)
+FINAL_VALUE = re.compile(r"[ \t]*[$`*_\"]*[ \t]*(-?[0-9]+)[ \t]*[.$`*_\"]*[ \t]*$")
 
 
 def make_panel(count=PILOT+EVAL):
@@ -71,12 +75,69 @@ def checkpoint(record, gold, tokenizer):
     return None,"wrong_step3_value" if wrong else "unverified_step3_line"
 
 
+def context_status(text,gold):
+    section = None
+    wrong = False
+    for line in text.split("\n")[:-1]:
+        if BOXED.search(line):
+            return "passed_step3_before_verified"
+        body = line.lstrip(" -*+`_\"\t")
+        body = RECORD_TITLE.sub("",body,count=1).lstrip(" `_*\"\t")
+        heading = STEP_TITLE.match(body)
+        if heading:
+            section = int(heading[1])
+            if section > CHECKPOINT:
+                return "passed_step3_before_verified"
+        named = STATE_TITLE.match(body)
+        if named:
+            step = int(named[1])
+            if step > CHECKPOINT:
+                return "passed_step3_before_verified"
+            if step == CHECKPOINT:
+                value = FINAL_VALUE.fullmatch(body[named.end():])
+                if value:
+                    if int(value[1]) == gold:
+                        return "verified_named_step3"
+                    wrong = True
+        if section == CHECKPOINT and "=" in body:
+            value = FINAL_VALUE.fullmatch(body.rpartition("=")[2])
+            if value and int(value[1]) == gold:
+                return "verified_step3_equation"
+    return "wrong_step3_value" if wrong else "no_verified_step3"
+
+
+def checkpoint_in_step(record,gold,tokenizer):
+    prior = record["tokens"][:LIMIT]
+    if THINK_END in prior:
+        prior = prior[:prior.index(THINK_END)]
+
+    def result(stop):
+        return context_status(tokenizer.decode(prior[:stop],skip_special_tokens=False),gold)
+
+    why = result(len(prior))
+    if not why.startswith("verified_"):
+        return None,why
+    lo,hi = 1,len(prior)
+    while lo < hi:
+        mid = (lo+hi)//2
+        if result(mid).startswith("verified_"):
+            hi = mid
+        else:
+            lo = mid+1
+    return lo,result(lo)
+
+
+CHECKPOINT_FORMATS = {"line":checkpoint,"step-context":checkpoint_in_step}
+
+
 def worker(a):
     cohort = a.root/"cohort.json"
     plan = load(cohort)
     smoke = a.phase=="pilot"
     panel = plan[a.phase] if smoke else plan[a.phase][a.part::2]
     draws = range(1 if smoke else plan["draws"])
+    checkpoint_format = plan.get("checkpoint_format","line")
+    select = CHECKPOINT_FORMATS[checkpoint_format]
     runtime = Runtime(a)
     empty = inputs_for(runtime.tokenizer,[x | {"completion_prefix":[]} for x in panel])
     direct = [x | {"no_think_ids":runtime.tokenizer.encode(render(runtime.tokenizer,x["row"],"no-think"),
@@ -88,7 +149,8 @@ def worker(a):
         def emit(value):
             print(json.dumps(value,allow_nan=False),file=stream,flush=True)
         emit({"kind":"manifest","phase":a.phase,"part":a.part,"cohort_sha256":sha(cohort),
-              "checkpoint_worker_sha256":sha(Path(__file__)),"budget":BUDGET,"limit":LIMIT,**runtime.manifest})
+              "checkpoint_worker_sha256":sha(Path(__file__)),"checkpoint_format":checkpoint_format,
+              "budget":BUDGET,"limit":LIMIT,**runtime.manifest})
         start = time.monotonic()
         for draw in draws:
             for i in range(0,len(panel),BLOCK):
@@ -99,7 +161,7 @@ def worker(a):
                 plain = runtime.generate(direct[i:i+BLOCK],"no_think",draw,BUDGET,start_after_marker=True)
                 eligible = []
                 for case,n,d in zip(batch,trunk,plain,strict=True):
-                    stop,why = checkpoint(n,case["states"][CHECKPOINT-1],runtime.tokenizer)
+                    stop,why = select(n,case["states"][CHECKPOINT-1],runtime.tokenizer)
                     emit({"kind":"landmark","id":n["id"],"draw":draw,"reason":why,"spent":stop,
                           "render_sha256":case["render_sha256"]})
                     emit(n | {"arm":NATURAL,"spent":0})
@@ -129,6 +191,8 @@ def report(root,phase,tokenizer):
     rows = {x["row"]["id"]:x for x in plan[phase]}
     files = load(root/"queue"/f"{phase}-done.json")["outputs"]
     draws = range(1 if phase=="pilot" else plan["draws"])
+    checkpoint_format = plan.get("checkpoint_format","line")
+    select = CHECKPOINT_FORMATS[checkpoint_format]
     check,results,seconds = {},{},[]
     [turn] = tokenizer.encode("<|im_end|>",add_special_tokens=False)
     for filename,fingerprint in files:
@@ -138,7 +202,8 @@ def report(root,phase,tokenizer):
         with path.open() as stream:
             head,*records,tail = map(json.loads,stream)
         if (head["cohort_sha256"] != sha(cohort) or head["checkpoint_worker_sha256"] != sha(Path(__file__))
-                or head["phase"] != phase or head["budget"] != BUDGET or tail["kind"] != "complete"):
+                or head["phase"] != phase or head["budget"] != BUDGET or tail["kind"] != "complete"
+                or head.get("checkpoint_format","line") != checkpoint_format):
             raise ValueError("unexpected checkpoint replay worker protocol")
         seconds.append(tail["seconds"])
         for record in records:
@@ -168,7 +233,7 @@ def report(root,phase,tokenizer):
         raise ValueError("incomplete checkpoint replay matrix")
     for pid,d in sorted(population):
         native = results[pid,d,NATURAL]
-        stop,why = checkpoint(native,rows[pid]["states"][CHECKPOINT-1],tokenizer)
+        stop,why = select(native,rows[pid]["states"][CHECKPOINT-1],tokenizer)
         if (stop,why) != (check[pid,d]["spent"],check[pid,d]["reason"]):
             raise ValueError("checkpoint selection did not reproduce from the recorded trace")
         if stop is not None and any(
@@ -204,7 +269,8 @@ def report(root,phase,tokenizer):
             table[name] = {"prompt_draws":len(pairs),"prompts":len({p for p,_ in pairs}),
                            "arms":arms,"correct_eos_contrasts":comparisons}
         windows[str(budget)] = table
-    return {"phase":phase,"draws":len(draws),"coverage":{"eligible":len(selected),"attempted":len(population)},
+    return {"phase":phase,"draws":len(draws),"checkpoint_format":checkpoint_format,
+            "coverage":{"eligible":len(selected),"attempted":len(population)},
             "landmarks":[check[k] for k in sorted(check)],"windows":windows,
             "worker_seconds":seconds,"verified_shards":files}
 
@@ -254,6 +320,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("action",choices=("freeze","run","score","launch","supervise"))
     p.add_argument("--phase",choices=("pilot","eval"))
+    p.add_argument("--checkpoint-format",choices=tuple(CHECKPOINT_FORMATS),default="line")
     for name in ("root","model","data","output","overlay","stable","source"):
         p.add_argument("--"+name,type=Path)
     for name in ("runtime-path","devices","host","cohort-sha256"):
@@ -264,7 +331,14 @@ def main():
     if a.action == "freeze":
         if a.output.exists():
             raise FileExistsError(a.output)
-        save(a.output,make_panel())
+        if a.checkpoint_format=="line":
+            plan = make_panel()
+        else:
+            plan = make_panel(PILOT+EVAL+PILOT)
+            plan["pilot"] = plan["eval"][EVAL:]
+            plan["eval"] = plan["eval"][:EVAL]
+            plan["checkpoint_format"] = a.checkpoint_format
+        save(a.output,plan)
         return
     if a.action == "run":
         worker(a)

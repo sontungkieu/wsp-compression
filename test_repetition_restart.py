@@ -5,7 +5,8 @@ from unittest.mock import patch
 from repetition_baseline import astra_instruction
 from repetition_cache_content_score import compare_values
 from repetition_cache_retention import content_pair, correctness
-from repetition_checkpoint_replay import checkpoint, make_panel
+from repetition_checkpoint_replay import checkpoint, checkpoint_in_step, make_panel
+from repetition_late_budget import probability_product
 from repetition_late_replay import cycle_landmarks, ends_in_motif
 from repetition_mediation import presence_scores
 from repetition_phase_trace import measurements, repeated_ngram_fraction
@@ -40,6 +41,15 @@ class TestRestartBudget(unittest.TestCase):
         self.assertFalse(ends_in_motif([8,9,7]*42,[7,8,9]))
         self.assertFalse(ends_in_motif([8,9,10]*44,[7,8,9]))
 
+    def test_motif_reentry_probability_accounts_for_every_forced_step(self):
+        result = probability_product([1.,.5,.25])
+        self.assertAlmostEqual(result["product"],.125)
+        self.assertEqual(result["singleton_steps"],1)
+        self.assertEqual(result["support_steps"],3)
+        impossible = probability_product([1.,0.,1.])
+        self.assertEqual(impossible["product"],0.)
+        self.assertIsNone(impossible["log_probability"])
+
     def test_retention_copy_mention_does_not_change_exact_match(self):
         class FakeTokenizer:
             def decode(self, ids, skip_special_tokens=False):
@@ -69,6 +79,23 @@ class TestRestartBudget(unittest.TestCase):
         self.assertEqual((len(pilot),len(test)),(8,32))
         self.assertEqual(len({x["row"]["prompt"] for x in pilot+test}),40)
         self.assertTrue(all(str(x["states"][-1])==x["row"]["gold"] for x in pilot+test))
+
+    def test_checkpoint_context_accepts_format_variants_but_rejects_next_step_coincidence(self):
+        class FakeTokenizer:
+            def decode(self, ids, skip_special_tokens=False):
+                return "".join(chr(i) for i in ids)
+        tokenizer = FakeTokenizer()
+        texts = (
+            ("  * **Operation 3:** Subtract 54.\n    $1012 - 4 = 1008$\n",1008,"verified_step3_equation"),
+            ("- State 3: 980\n",980,"verified_named_step3"),
+            ("Record: State 3 = 721.\n",721,"verified_named_step3"),
+        )
+        for text,gold,why in texts:
+            trace = {"tokens":list(map(ord,text+"**Operation 4:** Add 18.\n"))}
+            self.assertEqual(checkpoint_in_step(trace,gold,tokenizer),(len(text),why))
+        coincidence = "**Operation 3:** Subtract.\nState 3 = 791\n**Operation 4:** Add.\n$791 + 10 = 801$\n"
+        self.assertEqual(checkpoint_in_step({"tokens":list(map(ord,coincidence))},801,tokenizer),
+                         (None,"passed_step3_before_verified"))
 
     def test_content_sensitivity_cancels_a_lucky_identical_guess(self):
         case = {"task":"math","variants":{"plus":{"row":{"gold":"38"}},"minus":{"row":{"gold":"48"}}}}

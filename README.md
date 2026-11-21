@@ -414,11 +414,19 @@ states written by the model. A simulator verifies the third step before the
 replay landmark. The analysis charges the reasoning tokens to the total
 budget and reports both eligible-state performance and full-panel policy
 performance with native fallback.
+The optional step-context format accepts a labeled state or a completed
+equation inside step 3. It validates coverage on a fresh pilot before
+evaluating the original held-out questions.
 
 `repetition_model_sizes.py` checks native thinking and no-thinking on the
 same MATH-500 questions across byte-verified Qwen checkpoints. It scores
 2,048 and 4,096 tokens from each rollout and uses model-specific closing and
 EOS tokens when measuring completion and repetition.
+
+`repetition_late_budget.py` extends the observed late-replay panel to 4,096
+continuation tokens and compares nested windows with a no-thinking run from
+the question. A teacher-forced probe measures the probability of one complete
+cycle under the original presence history.
 
 ## Interpretation
 
