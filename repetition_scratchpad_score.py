@@ -47,7 +47,9 @@ def verify_inputs(row, expected):
 
 def read_matrix(root):
     manifest = root/"cohort.json"
-    cases = {x["row"]["id"]:x for x in load(manifest)["cases"]}
+    protocol = load(manifest)
+    cases = {x["row"]["id"]:x for x in protocol["cases"]}
+    arms, cap = tuple(protocol.get("arms",ARMS)), protocol.get("cap",CAP)
     source = sha(manifest)
     ready = sorted((root/"queue").glob("draw*-done.json"))
     if not ready:
@@ -65,8 +67,8 @@ def read_matrix(root):
             with path.open() as f:
                 header = json.loads(next(f))
                 lane, prompts = header["part"], header["prompt_ids"]
-                if (header["draw"]!=draw or header["cohort_sha256"]!=source or header["cap"]!=CAP
-                        or tuple(header["arms"])!=ARMS or header["sampling"]!=SAMPLING or lane in lanes
+                if (header["draw"]!=draw or header["cohort_sha256"]!=source or header["cap"]!=cap
+                        or tuple(header["arms"])!=arms or header["sampling"]!=SAMPLING or lane in lanes
                         or set(prompts)&seen or expected_layout.setdefault(lane,prompts)!=prompts):
                     raise ValueError("draw contract, shard order, or sampler changed")
                 lanes.add(lane)
@@ -91,13 +93,13 @@ def read_matrix(root):
                     if (row["kind"]!="rollout" or row["draw"]!=draw or row["seed"]!=seed_for(ident,draw)
                             or row["post_seed"]!=post_seed(ident,draw) or key in observations):
                         raise ValueError("invalid or duplicate factorial rollout")
-                    verify_trace(row,CAP,header["eos_ids"])
+                    verify_trace(row,cap,header["eos_ids"])
                     observations[key] = row
                 if set(inputs)!=set(prompts) or not completed:
                     raise ValueError("missing input metadata or completion footer")
         if lanes!={0,1} or seen!=set(cases):
             raise ValueError("incomplete draw panel")
-    expected = {(p,d,a) for p in cases for d in range(len(ready)) for a in ARMS}
+    expected = {(p,d,a) for p in cases for d in range(len(ready)) for a in arms}
     if observations.keys()!=expected:
         raise ValueError("incomplete paired arm matrix")
     return cases,observations,receipts,len(ready)
@@ -108,7 +110,17 @@ def paired_effect(scored, prompt_ids, draws, weights, metric):
                                    for arm,weight in weights.items()) for d in range(draws)] for p in prompt_ids})
 
 
-def summarize(cases, observations, receipts, draws, tokenizer):
+def drop_discordance(scored, prompt_ids, draws):
+    diffs = [[int(scored[p,d,DR]["eos_correct"])-int(scored[p,d,KR]["eos_correct"])
+              for d in range(draws)] for p in prompt_ids]
+    return {"drop_improves":sum(delta>0 for run in diffs for delta in run),
+            "drop_harms":sum(delta<0 for run in diffs for delta in run),
+            "prompts_net_improve":sum(sum(run)>0 for run in diffs),
+            "prompts_net_harm":sum(sum(run)<0 for run in diffs),
+            "prompts_both_directions":sum(min(run)<0<max(run) for run in diffs)}
+
+
+def summarize(cases, observations, receipts, draws, tokenizer, cap=CAP):
     [turn] = tokenizer.encode("<|im_end|>",add_special_tokens=False)
     groups = {"all":list(cases)}
     for p,case in cases.items():
@@ -117,19 +129,25 @@ def summarize(cases, observations, receipts, draws, tokenizer):
         length = len(case["completion_prefix"])
         band = "under_1024" if length<1024 else "1024_to_3071" if length<3072 else "3072_or_more"
         groups.setdefault("length:"+band,[]).append(p)
+    observed_arms = {key[2] for key in observations}
+    arms = tuple(a for a in ARMS if a in observed_arms)
+    effects_spec = {name:weights for name,weights in EFFECTS.items() if set(weights).issubset(arms)}
     report = {"observations":len(observations),"draws":draws,"receipts":receipts,"windows":{}}
-    for budget in (256,CAP):
+    for budget in (b for b in (256,512,1024,1536,2048) if b<=cap):
         y = {k:assess_window(cases[k[0]]["row"],r,"post",budget,tokenizer,turn)
              for k,r in observations.items()}
         table = {}
         for group,ids in groups.items():
             counts = {}
-            for arm in ARMS:
+            for arm in arms:
                 results = [y[p,d,arm] for p in ids for d in range(draws)]
                 counts[arm] = {"n":len(results),**{m:sum(bool(r[m]) for r in results) for m in METRICS}}
             effects = {name:{metric:paired_effect(y,ids,draws,weight,metric)
-                             for metric in ("eos_correct","success")} for name,weight in EFFECTS.items()}
-            table[group] = {"prompts":len(ids),"arms":counts,"effects":effects}
+                         for metric in ("eos_correct","success")} for name,weight in effects_spec.items()}
+            cell = {"prompts":len(ids),"arms":counts,"effects":effects}
+            if {DR,KR}.issubset(arms):
+                cell["drop_context_reset_discordance"] = drop_discordance(y,ids,draws)
+            table[group] = cell
         report["windows"][str(budget)] = table
     return report
 
@@ -141,7 +159,7 @@ if __name__ == "__main__":
     a = p.parse_args()
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(a.model,local_files_only=True)
-    out = summarize(*read_matrix(a.root),tokenizer)
+    out = summarize(*read_matrix(a.root),tokenizer,cap=load(a.root/"cohort.json").get("cap",CAP))
     if a.output.exists():
         raise FileExistsError(a.output)
     save(a.output,out)

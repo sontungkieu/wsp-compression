@@ -118,14 +118,14 @@ def verify_trace(record, cap, eos_ids):
         raise ValueError("post-marker seed mismatch")
 
 
-def smoke(runtime, rows, out):
+def smoke(runtime, rows, out, arms, cap):
     base = inputs_for(runtime.tokenizer, rows)
     batches, packed, hashes = prepare_group(runtime, base)
     emit = lambda data: print(json.dumps(data,allow_nan=False),file=out,flush=True)
     evidence = first_step_audit(runtime, batches, packed)
-    for arm in ARMS:
-        for row in runtime.generate(batches[arm],"e0",0,CAP,packed=packed[arm]):
-            verify_trace(row,CAP,runtime.eos)
+    for arm in arms:
+        for row in runtime.generate(batches[arm],"e0",0,cap,packed=packed[arm]):
+            verify_trace(row,cap,runtime.eos)
             emit(row | {"arm":arm})
     empty = inputs_for(runtime.tokenizer,[row | {"completion_prefix":[]} for row in rows])
     b,p,_ = prepare_group(runtime,empty)
@@ -143,6 +143,9 @@ def smoke(runtime, rows, out):
 def run(args):
     input_file = args.canary if args.action=="smoke" else args.root/"cohort.json"
     manifest = load(input_file)
+    arms, cap = tuple(manifest.get("arms",ARMS)), manifest.get("cap",CAP)
+    if len(set(arms))!=len(arms) or not arms or set(arms)-set(ARMS) or not 256<=cap<=2048:
+        raise ValueError("invalid scratchpad treatment contract")
     rows = manifest["cases"]
     if args.action=="smoke":
         rows = [next(i for i in rows if i["stratum"]==g) for g in STRATA]
@@ -153,23 +156,23 @@ def run(args):
     with args.output.open("x") as out, runtime.torch.inference_mode():
         def emit(data):
             print(json.dumps(data,allow_nan=False),file=out)
-        emit({"kind":"manifest","partitions":args.partitions,"part":args.part,"draw":args.draw,"arms":ARMS,
+        emit({"kind":"manifest","partitions":args.partitions,"part":args.part,"draw":args.draw,"arms":arms,
               "cohort_sha256":sha(input_file),"base_commit":BASE_COMMIT,"factorial_sha256":sha(Path(__file__)),
-              "cap":CAP,"batch_size":BATCH_SIZE,"prompt_ids":[x["row"]["id"] for x in rows],**runtime.manifest})
+              "cap":cap,"batch_size":BATCH_SIZE,"prompt_ids":[x["row"]["id"] for x in rows],**runtime.manifest})
         if args.action=="smoke":
-            smoke(runtime,rows,out)
+            smoke(runtime,rows,out,arms,cap)
         else:
             items = inputs_for(runtime.tokenizer,rows)
             for start in range(0,len(items),BATCH_SIZE):
                 batch, packed, hashes = prepare_group(runtime,items[start:start+BATCH_SIZE])
                 for h in hashes:
                     emit({"kind":"inputs",**h})
-                for arm in ARMS:
+                for arm in arms:
                     if time.time()>=args.deadline-45:
                         raise TimeoutError("scratchpad hard deadline")
-                    results = runtime.generate(batch[arm],"e0",args.draw,CAP,packed=packed[arm])
+                    results = runtime.generate(batch[arm],"e0",args.draw,cap,packed=packed[arm])
                     for row in results:
-                        verify_trace(row,CAP,runtime.eos)
+                        verify_trace(row,cap,runtime.eos)
                         emit(row | {"arm":arm})
                     out.flush()
                     print(f"draw={args.draw} prompts={start+len(batch[arm])}/{len(items)} arm={arm}",flush=True)

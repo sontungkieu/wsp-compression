@@ -57,10 +57,11 @@ class ScratchpadQueue(Supervisor):
 
     def supervise(self):
         try:
-            self.status("admitted", exposure_sha256=digest(self.root/"exposure.json"),completed_draws=[])
-            panel = self.discover()
+            exposure = self.root/"exposure.json"
+            self.status("admitted", exposure_sha256=digest(exposure) if exposure.exists() else None,completed_draws=[])
+            panel = load(self.root/"cohort.json") if self.args.cohort_sha256 else self.discover()
             self.status("cohort_frozen",cohort_sha256=digest(self.root/"cohort.json"),
-                        cases=len(panel["cases"]),strata=panel["counts"],discovery_shards=len(panel["discovery_sources"]))
+                        cases=len(panel["cases"]),strata=panel["counts"],discovery_shards=len(panel.get("discovery_sources",[])))
             for draw in range(DRAWS):
                 prior = self.state.get("last_draw_seconds")
                 if not self.bounded(300 if prior is None else 1.15*prior+100):
@@ -85,12 +86,13 @@ class ScratchpadQueue(Supervisor):
             raise
 
 
-def verify_canary(canary, worker):
+def verify_canary(canary, worker, arms, cap):
     with canary.open() as stream:
         h,*rows,end = map(json.loads,stream)
     audit = [x for x in rows if x["kind"]=="audit"]
     rollout = [x for x in rows if x["kind"]=="rollout"]
-    if (h["factorial_sha256"]!=digest(worker) or tuple(h["arms"])!=ARMS or len(rollout)!=12
+    if (h["factorial_sha256"]!=digest(worker) or tuple(h["arms"])!=arms or h["cap"]!=cap
+            or len(rollout)!=len(h["prompt_ids"])*len(arms)
             or end["kind"]!="complete" or len(audit)!=1 or not audit[0]["empty_pair_exact"]
             or not audit[0]["gpu_canary"]):
         raise ValueError("scratchpad factorial canary has not passed")
@@ -99,27 +101,37 @@ def verify_canary(canary, worker):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("action",choices=("launch","supervise"))
-    for name in ("root","model","data","baseline","overlay","stable","source","canary-report"):
+    for name in ("root","model","data","overlay","stable","source","canary-report"):
         p.add_argument("--"+name,type=Path,required=True)
-    for name in ("runtime-path","devices","exposure-sha256","plan-sha256"):
+    for name in ("runtime-path","devices"):
         p.add_argument("--"+name,required=True)
+    p.add_argument("--baseline",type=Path)
+    p.add_argument("--exposure-sha256")
+    p.add_argument("--plan-sha256")
+    p.add_argument("--cohort-sha256")
     p.add_argument("--deadline",type=int,required=True)
     a = p.parse_args()
     q = ScratchpadQueue(a)
-    if socket.gethostname()!=HOST or len(set(q.devices))!=2 or not 420 < a.deadline-time.time()<=10800:
+    if socket.gethostname()!=HOST or len(set(q.devices))!=2 or a.deadline-time.time()<=420:
         raise ValueError("incorrect hostname, assigned devices, or expiry")
     hashes = load(a.source)
     if any(digest(q.source/n)!=fingerprint for n,fingerprint in hashes.items()):
         raise ValueError("source SHA mismatch")
-    if digest(q.root/"exposure.json")!=a.exposure_sha256:
-        raise ValueError("exposure audit changed")
-    if digest(q.root/"discovery-plan.json")!=a.plan_sha256:
-        raise ValueError("discovery plan changed")
+    if a.cohort_sha256:
+        if digest(q.root/"cohort.json")!=a.cohort_sha256:
+            raise ValueError("fixed cohort changed")
+        protocol = load(q.root/"cohort.json")
+    else:
+        if not (a.baseline and a.exposure_sha256 and a.plan_sha256):
+            raise ValueError("discovery requires a baseline and initial plan")
+        if digest(q.root/"exposure.json")!=a.exposure_sha256 or digest(q.root/"discovery-plan.json")!=a.plan_sha256:
+            raise ValueError("discovery audit changed")
+        protocol = {}
     if a.action=="supervise":
         q.supervise()
         return
     check_devices(q.devices)
-    verify_canary(a.canary_report,q.worker)
+    verify_canary(a.canary_report,q.worker,tuple(protocol.get("arms",ARMS)),protocol.get("cap",512))
     q.lane.mkdir()
     with (q.lane/"supervisor.log").open("x") as log:
         child = subprocess.Popen([sys.executable,"-B",__file__,"supervise",*sys.argv[2:]],

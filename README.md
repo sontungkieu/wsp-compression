@@ -329,6 +329,9 @@ the same padded width per batch.
 `repetition_scratchpad_score.py` verifies the per-arm hashes and reports
 numeric correctness with EOS from nested 256- and 512-token windows, with
 prompt-paired contrasts and the factorial interaction.
+`repetition_scratchpad_cap.py` freezes a hash-ranked subset of the factorial
+panel for 2,048-token cap sensitivity with reset presence history. It audits
+cross-run 512-token trace parity separately from the nested cap comparisons.
 
 ## Interpretation
 
