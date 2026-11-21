@@ -375,6 +375,19 @@ generation and forced exits on matched reasoning prefixes. The worker applies
 the patch to the loaded model in memory and pairs it with the original model
 on math and a separate no-thinking copy set.
 
+`repetition_exit_scaffold.py` varies newlines immediately before and after
+the closing marker. It checks the rendered no-thinking bytes and couples the
+presence set, post-marker seed, and answer budget across all four variants.
+The canary compares a prefilled marker with a forced marker at an identical
+token sequence and records logit drift.
+
+`repetition_phase_trace.py` reports sustained exact cycles, recurrent
+16-grams and within-window duplicate fractions before the reasoning close.
+Its switch analysis uses only tokens available at the fixed switch point.
+`repetition_native_horizon.py` chooses a long rollout cap for 12 fixed
+questions after a separate timing pilot and scores nested windows from
+2,048 tokens up to the selected 16,384- or 32,768-token horizon.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.

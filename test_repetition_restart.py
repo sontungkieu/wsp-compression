@@ -3,6 +3,7 @@ import unittest
 
 from repetition_baseline import astra_instruction
 from repetition_mediation import presence_scores
+from repetition_phase_trace import measurements, repeated_ngram_fraction
 from repetition_restart import nested_restart, output_row, reaches_switch, score_policy
 from repetition_restart_cohort import canonical_problem
 from repetition_restart_extension import CARD_SAMPLING
@@ -18,6 +19,14 @@ def result(ids, eos=None):
 
 
 class TestRestartBudget(unittest.TestCase):
+    def test_internal_cycle_is_distinguished_from_terminal_repetition(self):
+        ids = list(range(7))*24+list(range(100,300))
+        modes = measurements(ids)
+        self.assertTrue(modes["exact_cycle_anywhere"])
+        self.assertFalse(modes["exact_cycle_terminal"])
+        self.assertGreater(modes["early_16"],modes["late_16"])
+        self.assertEqual(repeated_ngram_fraction(list(range(128)),8),0)
+
     def test_other_tokenizer_uses_its_own_marker_at_switch_and_cap(self):
         marker = 151668
         native = result([4,marker,7], 151645)

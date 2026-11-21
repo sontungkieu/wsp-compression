@@ -151,7 +151,7 @@ class Runtime:
         return padded(ids, self.pad, self.torch)
 
     def generate(self, batch, arm, draw, cap, hook=nullcontext(), bias=0., *,
-                 packed=None, first_transform=None, matched_budget=False, policy=None):
+                 packed=None, first_transform=None, matched_budget=False, policy=None, start_after_marker=False):
         no_think = arm == "no_think"
         [marker] = self.groups["think"]
         exit_at = EXIT_STEPS.get(arm)
@@ -162,9 +162,13 @@ class Runtime:
         if packed is None:
             packed = self.pack([x["no_think_ids"] if no_think else x["native_ids"] for x in batch])
         width = packed["input_ids"].shape[1]
-        seeds = [seed_for(x["row"]["id"], draw) for x in batch]
         post = [post_seed(x["row"]["id"], draw) for x in batch]
+        seeds = post if start_after_marker else [seed_for(x["row"]["id"], draw) for x in batch]
         sampler = (self.policy if policy is None else policy)(batch, width, seeds, post, exit_at, bias)
+        if start_after_marker:
+            if exit_at is not None:
+                raise ValueError("a post-marker prefix cannot use a pending-marker policy")
+            sampler.reset = [True]*len(batch)
         sampler.first_transform = first_transform
         total = cap if exit_at is None else cap + exit_at + 1
         if matched_budget and exit_at is None:
