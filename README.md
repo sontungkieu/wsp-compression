@@ -342,6 +342,38 @@ both reset presence history and preserve native outcomes when the model closes
 before the switch. Discarded reasoning still counts against the total budget.
 Pilot generation checks that a real restart matches a nested immediate-exit
 trace at the remaining budget before evaluation can reuse the nested trace.
+`repetition_restart_extension.py` measures nested 2,048- and 4,096-token
+windows on a hash-ranked 32-problem subset, keeping the shared-sampler
+comparison and a separate no-thinking control configured from the pinned
+Qwen model card. `repetition_restart_visible.py` additionally scores the
+explicit assistant turn boundary independently of the configured EOS.
+
+`repetition_cache_swap_queue.py` tests the joint convolution and recurrent
+state swap at the first forced closing token on Qwen3.5. The canary checks
+that the attention cache bytes stay identical up to that forward call, that
+donor states are copied, and that self-copy reproduces the native token trace.
+The development score compares the swap with native retained context and the
+question-only reference at the same post-marker budget.
+
+`repetition_restart_transfer.py` repeats the question-level matrix on
+Qwen3-1.7B at 4,096 tokens, with a nested 2,048-token cut on the same 32
+questions as the Qwen3.5 budget extension. Its preflight verifies bytes
+against the public checkpoint snapshot and derives closure, turn and EOS IDs
+for that tokenizer. The canary checks explicit restart, the common trunk,
+and the model-specific token ledger on a separate panel.
+
+`repetition_cache_factorial.py` reuses each of two native 512-token traces
+on the 32 reserved numeric MATH-500 questions. It tests convolution and
+recurrent matrix state changes independently at the forced closing token,
+verifies identical initial attention cache bytes across the four treatments,
+and reports factorial effects and the question-only reference at the same
+continuation budget.
+
+`repetition_published_astra.py` verifies the original and edited BF16
+tensor digests for the published sparse Astra patch before comparing native
+generation and forced exits on matched reasoning prefixes. The worker applies
+the patch to the loaded model in memory and pairs it with the original model
+on math and a separate no-thinking copy set.
 
 ## Interpretation
 

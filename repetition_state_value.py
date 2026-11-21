@@ -29,10 +29,10 @@ def post_seed(prompt, draw):
     return seed_for(prompt, draw) ^ 0x19595DF4C2A31F17
 
 
-def generated_span(ids, stop_ids, post_cap=None):
+def generated_span(ids, stop_ids, post_cap=None, *, marker=THINK_END):
     """Remove stopped-row padding before interpreting EOS at a forced arm's cap."""
-    if post_cap is not None and THINK_END in ids:
-        ids = ids[:ids.index(THINK_END) + 1 + post_cap]
+    if post_cap is not None and marker in ids:
+        ids = ids[:ids.index(marker) + 1 + post_cap]
     stop = next((i for i, tok in enumerate(ids) if tok in stop_ids), None)
     return (ids, None) if stop is None else (ids[:stop], ids[stop])
 
@@ -64,8 +64,9 @@ def inputs_for(tokenizer, cases):
     return output
 
 
-def make_timing_policy(torch, transformers, groups):
-    base = processor_factory(torch, transformers, groups)
+def make_timing_policy(torch, transformers, groups, sampling=SAMPLING):
+    base = processor_factory(torch, transformers, groups, sampling)
+    [marker] = groups["think"]
 
     class TimingPolicy(base):
         def __init__(self, group, width, seeds, post, exit_at, bias):
@@ -79,18 +80,18 @@ def make_timing_policy(torch, transformers, groups):
             history = ids[:, self.width:]
             step = history.shape[1]
             if step and not all(self.reset):
-                for i, mark in enumerate((history[:, -1] == THINK_END).tolist()):
+                for i, mark in enumerate((history[:, -1] == marker).tolist()):
                     if mark and not self.reset[i]:
                         self.row_generators[i].manual_seed(self.post[i])
                         self.reset[i] = True
             if not step and self.bias:
                 scores = scores.float().clone()
-                scores[:, THINK_END] += self.bias
+                scores[:, marker] += self.bias
             sampled = super().__call__(ids, scores)
             if step == self.exit_at:
-                force = ~(history == THINK_END).any(dim=-1)
+                force = ~(history == marker).any(dim=-1)
                 forced = torch.full_like(sampled, -torch.inf)
-                forced[:, THINK_END] = 0.
+                forced[:, marker] = 0.
                 sampled = torch.where(force[:, None], forced, sampled)
             return sampled
 
@@ -101,9 +102,9 @@ def make_timing_policy(torch, transformers, groups):
 
         def __call__(self, ids, scores, **kwargs):
             part = ids[:, self.width:]
-            marker = part == THINK_END
-            first = marker.to(torch.int32).argmax(-1)
-            closed = marker.any(-1)
+            matched = part == marker
+            first = matched.to(torch.int32).argmax(-1)
+            closed = matched.any(-1)
             stop = closed & ((part.shape[1] - first - 1) >= self.cap)
             return stop if self.reasoning_cap is None else stop | (~closed & (part.shape[1] >= self.reasoning_cap))
 
@@ -150,8 +151,9 @@ class Runtime:
         return padded(ids, self.pad, self.torch)
 
     def generate(self, batch, arm, draw, cap, hook=nullcontext(), bias=0., *,
-                 packed=None, first_transform=None, matched_budget=False):
+                 packed=None, first_transform=None, matched_budget=False, policy=None):
         no_think = arm == "no_think"
+        [marker] = self.groups["think"]
         exit_at = EXIT_STEPS.get(arm)
         is_copy = batch[0]["row"]["task"] == "copy"
         if any((x["row"]["task"] == "copy") != is_copy for x in batch):
@@ -162,7 +164,7 @@ class Runtime:
         width = packed["input_ids"].shape[1]
         seeds = [seed_for(x["row"]["id"], draw) for x in batch]
         post = [post_seed(x["row"]["id"], draw) for x in batch]
-        sampler = self.policy(batch, width, seeds, post, exit_at, bias)
+        sampler = (self.policy if policy is None else policy)(batch, width, seeds, post, exit_at, bias)
         sampler.first_transform = first_transform
         total = cap if exit_at is None else cap + exit_at + 1
         if matched_budget and exit_at is None:
@@ -177,11 +179,11 @@ class Runtime:
                                       stopping_criteria=criteria, **self.defaults)
         results = []
         for i, (x, ids) in enumerate(zip(batch, out[:, width:].tolist(), strict=True)):
-            if matched_budget and exit_at is None and THINK_END not in ids[:cap]:
+            if matched_budget and exit_at is None and marker not in ids[:cap]:
                 ids = ids[:cap]
             post_cap = cap if matched_budget or exit_at is not None else None
-            ids_no_eos, stop = generated_span(ids, stop_ids, post_cap)
-            at = ids_no_eos.index(THINK_END) if THINK_END in ids_no_eos else None
+            ids_no_eos, stop = generated_span(ids, stop_ids, post_cap, marker=marker)
+            at = ids_no_eos.index(marker) if marker in ids_no_eos else None
             if exit_at is not None and (at is None and stop is None or at is not None and at > exit_at):
                 raise ValueError("timing arm violated the requested closure")
             if exit_at == 0 and at != 0:

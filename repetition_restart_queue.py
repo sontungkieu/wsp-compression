@@ -38,6 +38,8 @@ def verify_smoke(path, source, cohort):
 
 
 class RestartQueue(Supervisor):
+    worker_args = ()
+
     def __init__(self, args):
         args.role, args.output = "queue", args.root
         super().__init__(args)
@@ -50,7 +52,7 @@ class RestartQueue(Supervisor):
         plans = []
         for i in range(len(self.devices)):
             out = self.lane/f"{label}-{i:02d}.jsonl"
-            argv = [self.worker, "--phase", phase, "--root", self.root, "--model", self.args.model,
+            argv = [self.worker, *self.worker_args, "--phase", phase, "--root", self.root, "--model", self.args.model,
                     "--data", self.args.data, "--output", out, "--deadline", self.args.deadline,
                     "--part", i, "--partitions", len(self.devices), "--draw", draw]
             plans.append((i, out, argv))

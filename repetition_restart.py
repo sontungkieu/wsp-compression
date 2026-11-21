@@ -18,10 +18,10 @@ BATCH = 8
 BASE = "4f9403621008c0f8ffe56c3e5087b0ae95ede75a"
 
 
-def reaches_switch(row, switch):
+def reaches_switch(row, switch, marker=THINK_END):
     """Only interrupt a still-thinking trajectory after exactly switch tokens."""
     before = tokens(row)[:switch]
-    return len(before)==switch and THINK_END not in before and (
+    return len(before)==switch and marker not in before and (
         row["eos_token"] is None or len(row["tokens"])>=switch)
 
 
@@ -30,7 +30,7 @@ def nested_restart(question, budget, switch):
     return {"tokens":response,"eos_token":question["eos_token"] if eos else None}
 
 
-def output_row(source, arm, budget, *, prefix=(), switched=False, source_arm=None):
+def output_row(source, arm, budget, *, prefix=(), switched=False, source_arm=None, marker=THINK_END):
     result = {"kind":"rollout","id":source["id"],"draw":source["draw"],"seed":source["seed"],
               "post_seed":source["post_seed"],"arm":arm,"tokens":list(prefix)+source["tokens"],
               "eos_token":source["eos_token"],"switched":switched,"source_arm":source_arm,
@@ -38,9 +38,9 @@ def output_row(source, arm, budget, *, prefix=(), switched=False, source_arm=Non
     used = len(tokens(result))
     if used>budget or (result["eos_token"] is None and used!=budget):
         raise ValueError("continuation does not respect the fixed total budget")
-    if switched and result["tokens"][len(prefix)]!=THINK_END:
+    if switched and result["tokens"][len(prefix)]!=marker:
         raise ValueError("restart failed to generate the real closing marker")
-    if arm=="question_e0" and result["tokens"][0]!=THINK_END:
+    if arm=="question_e0" and result["tokens"][0]!=marker:
         raise ValueError("question E0 did not close at step zero")
     return result
 
@@ -54,6 +54,7 @@ def prepare_items(runtime,cases):
 
 
 def batch_run(runtime, group, draw, budget, switch, diagnostics):
+    [marker] = runtime.groups["think"]
     width = max(max(len(x["native_ids"])+switch,len(x["no_think_ids"])) for x in group)
     question_pack = pack_at(runtime,[x["native_ids"] for x in group],width)
     direct_pack = pack_at(runtime,[x["no_think_ids"] for x in group],width)
@@ -69,7 +70,7 @@ def batch_run(runtime, group, draw, budget, switch, diagnostics):
     native = generate("native","native",group,budget,question_pack)
     direct = generate("no_think","no_think",group,budget,direct_pack)
     question = generate("question_e0","e0",group,budget-1,question_pack)
-    switches = [reaches_switch(r,switch) for r in native]
+    switches = [reaches_switch(r,switch,marker) for r in native]
     prior = [r["tokens"][:switch] if applies else [] for r,applies in zip(native,switches,strict=True)]
     retained = [x | {"native_ids":x["native_ids"]+s,"presence_seed_ids":[]}
                 for x,s in zip(group,prior,strict=True)]
@@ -90,15 +91,15 @@ def batch_run(runtime, group, draw, budget, switch, diagnostics):
             probe["prefill_seconds"][name] = time.monotonic()-start
     rows = []
     for i,item in enumerate(group):
-        rows.extend(output_row(r,arm,budget) for r,arm in
+        rows.extend(output_row(r,arm,budget,marker=marker) for r,arm in
                     ((native[i],"native"),(direct[i],"no_think"),(question[i],"question_e0")))
         if switches[i]:
             nested = question[i] | nested_restart(question[i],budget,switch)
             resumed = restart[i] if restart is not None else nested
             matches = tokens(resumed)==tokens(nested)
-            keep_result = output_row(keep[i],"switch_keep",budget,prefix=prior[i],switched=True)
+            keep_result = output_row(keep[i],"switch_keep",budget,prefix=prior[i],switched=True,marker=marker)
             reset_result = output_row(resumed,"switch_restart",budget,prefix=prior[i],switched=True,
-                                      source_arm="explicit_restart" if restart is not None else "question_e0")
+                                      source_arm="explicit_restart" if restart is not None else "question_e0",marker=marker)
             reset_result["nested_parity"] = matches if restart is not None else None
             rows.extend((keep_result,reset_result))
         else:

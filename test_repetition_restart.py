@@ -2,9 +2,14 @@
 import unittest
 
 from repetition_baseline import astra_instruction
+from repetition_mediation import presence_scores
 from repetition_restart import nested_restart, output_row, reaches_switch, score_policy
 from repetition_restart_cohort import canonical_problem
+from repetition_restart_extension import CARD_SAMPLING
+from repetition_restart_score import restart_decomposition
+from repetition_restart_visible import score_visible
 from repetition_state_data import THINK_END
+from repetition_state_value import generated_span
 
 
 def result(ids, eos=None):
@@ -13,6 +18,41 @@ def result(ids, eos=None):
 
 
 class TestRestartBudget(unittest.TestCase):
+    def test_other_tokenizer_uses_its_own_marker_at_switch_and_cap(self):
+        marker = 151668
+        native = result([4,marker,7], 151645)
+        self.assertFalse(reaches_switch(native, 2, marker))
+        self.assertTrue(reaches_switch(native, 2))
+        self.assertEqual(generated_span([marker,7,8,151645], {151645}, 1, marker=marker),
+                         ([marker,7], None))
+        forced = output_row(result([marker,8], 151645), "question_e0", 3, marker=marker)
+        self.assertEqual(forced["tokens"][0], marker)
+
+    def test_model_card_sampler_settings_do_not_change_the_shared_sampler(self):
+        class Logits:
+            def float(self):
+                return 7.0
+        self.assertAlmostEqual(presence_scores(Logits(), True), (7.0-1.5)/.6)
+        self.assertEqual(presence_scores(Logits(), True, CARD_SAMPLING), 5.0)
+
+    def test_visible_stop_scores_only_before_the_turn_marker(self):
+        class FakeTokenizer:
+            def decode(self, ids, skip_special_tokens=False):
+                return "".join({7:r"\boxed{42}",8:r"\boxed{10}"}[i] for i in ids)
+        row = output_row(result([7,99,8], None), "no_think", 3)
+        visible = score_visible({"gold":"42"}, row, FakeTokenizer(), 99)
+        self.assertTrue(visible["correct_turn_without_eos"])
+
+    def test_restart_effect_splits_into_early_gains_and_late_token_cost(self):
+        rows = {}
+        for prompt, values in {"early_good": (1,0,1), "early_bad": (0,1,0), "late": (0,1,0)}.items():
+            for arm, result in zip(("native", "question_e0", "switch_restart"), values):
+                rows[prompt,0,arm] = {"correct_eos": result}
+        audit = restart_decomposition(rows, ("early_good", "early_bad", "late"), 1, {("late",0)})
+        self.assertEqual(audit["early_native_gain_pairs"], 1)
+        self.assertEqual(audit["early_native_loss_pairs"], 1)
+        self.assertEqual(audit["switched_budget_loss_pairs"], 1)
+
     def test_staged_dataset_can_already_have_the_canonical_instruction(self):
         instruction = astra_instruction("canonical")
         expected = "Find the ratio.\n"+instruction

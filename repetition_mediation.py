@@ -95,13 +95,13 @@ def presence_ids(item):
     return sorted(set(ids))
 
 
-def presence_scores(logits, seen):
-    return (logits.float() - SAMPLING["presence_penalty"] * seen) / SAMPLING["temperature"]
+def presence_scores(logits, seen, sampling=SAMPLING):
+    return (logits.float() - sampling["presence_penalty"] * seen) / sampling["temperature"]
 
 
-def processor_factory(torch, transformers, groups):
-    top_k = transformers.TopKLogitsWarper(top_k=SAMPLING["top_k"])
-    top_p = transformers.TopPLogitsWarper(top_p=SAMPLING["top_p"])
+def processor_factory(torch, transformers, groups, sampling=SAMPLING):
+    top_k = transformers.TopKLogitsWarper(top_k=sampling["top_k"])
+    top_p = transformers.TopPLogitsWarper(top_p=sampling["top_p"])
 
     class CoupledPolicy(transformers.LogitsProcessor):
         def __init__(self, group, width, groups_to_swap, seed, *, row_seeds=None, force_first=None):
@@ -131,13 +131,13 @@ def processor_factory(torch, transformers, groups):
             seen = self.seen_mask(history, scores)
             if self.tensors:
                 base, donor = scores.float().split(self.n, dim=0)
-                base = presence_scores(base, seen)
-                donor = presence_scores(donor, seen)
+                base = presence_scores(base, seen, sampling)
+                donor = presence_scores(donor, seen, sampling)
                 active = self.pending & ~(history == groups["think"][0]).any(dim=-1)
                 mixed = transfer_masses(base, donor, self.tensors, torch)
                 result = torch.where(active[:, None], mixed, base)
             else:
-                base = result = presence_scores(scores, seen)
+                base = result = presence_scores(scores, seen, sampling)
             sampled = top_p(ids[:self.n], top_k(ids[:self.n], result))
             probabilities = sampled.softmax(dim=-1)
             if self.first_step is None:
