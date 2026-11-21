@@ -2,7 +2,7 @@
 import unittest
 
 from repetition_sampler import BOUND_TOL, Boundary, match_marker, temperature_scores
-from repetition_sampler_reach import bounded_cast, choose
+from repetition_sampler_reach import bounded_cast, choose, norm_matched_arms
 
 try:
     import torch
@@ -68,6 +68,19 @@ class BoundaryTest(unittest.TestCase):
         delta = torch.tensor([[.002, -.002, .009]])
         changed = bounded_cast(original, delta, .0095, torch)
         self.assertLessEqual(float((changed.float() - original.float()).norm()), .0095)
+
+    def test_normalize_each_direction_to_the_same_per_row_budget(self):
+        n = torch.tensor([[0., 0., 0.], [1., 0., 0.]])
+        blank = torch.tensor([[0., 1., 0.], [1., 2., 0.]])
+        left = torch.tensor([[2., 1., 0.], [1., 2., 3.]])
+        old = torch.tensor([0., 0., 1.])
+        group = [{"row": {"id": "one"}}, {"row": {"id": "two"}}]
+        arms = norm_matched_arms({"native": n, "blank": blank, "left": left}, old, group, torch)
+        budgets = {"blank_delta_norm": (left - blank).norm(dim=-1),
+                   "full_donor_norm": (left - n).norm(dim=-1)}
+        for name, (receiver, moved) in arms.items():
+            self.assertEqual(receiver, "native")
+            torch.testing.assert_close((moved - n).norm(dim=-1), budgets[name.split(":")[0]])
 
 
 if __name__ == "__main__":

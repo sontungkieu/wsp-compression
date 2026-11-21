@@ -299,6 +299,9 @@ Replay compares each activation with a first-step decoder control that
 matches the marker probability and preserves native non-marker conditionals.
 The native and patched policies share 512-token reasoning and post-close
 budgets. All runs record per-prompt hashes and shard receipts.
+The optional `--norm-only` run compares directions at equal per-state
+L2 budgets set by the blank-to-bracket and native-to-bracket distances.
+It uses a separate output root and performs prefill only.
 
 ## Interpretation
 

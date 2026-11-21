@@ -26,6 +26,10 @@ class ReachQueue(StateQueue):
     def run(self):
         try:
             self.status("admitted", source_sha256=digest(self.args.source), cohort_sha256=self.args.cohort_sha256)
+            if self.args.norm_only:
+                result = self.probe("norm-eval")
+                self.status("completed" if result else "partial_deadline")
+                return
             if not self.probe("probe-dev"):
                 self.status("partial_deadline")
                 return
@@ -75,6 +79,7 @@ def main():
     p.add_argument("--deadline", type=int, required=True)
     p.add_argument("--devices", required=True)
     p.add_argument("--cohort-sha256", required=True)
+    p.add_argument("--norm-only", action="store_true")
     args = p.parse_args()
     q = ReachQueue(args)
     if (socket.gethostname() != HOST or len(set(q.devices)) != 2
@@ -94,7 +99,8 @@ def main():
     check_devices(q.devices)
     with (q.root / "prefill-smoke.jsonl").open() as stream:
         head, *rows, end = map(json.loads, stream)
-    if (head["reach_sha256"] != source["files"][q.worker.name] or end["kind"] != "complete"
+    phase = "norm-eval" if args.norm_only else "probe-dev"
+    if (head["reach_sha256"] != source["files"][q.worker.name] or head["phase"] != phase or end["kind"] != "complete"
             or len(rows) != 3 or head["cohort_sha256"] != args.cohort_sha256
             or max(r["sampler_parity_max"] for r in rows) > 2e-7):
         raise ValueError("prefill smoke did not verify shipped source and sampler parity")

@@ -20,7 +20,7 @@ from repetition_sampler import BOUND_TOL, Boundary, match_marker, temperature_sc
 from repetition_state_data import THINK_END
 from repetition_state_value import Runtime, delivery_header, inputs_for, post_seed, read_matrix, summarize
 
-PHASES = ("probe-dev", "higher-dev", "oracle-dev", "probe-eval", "replay")
+PHASES = ("probe-dev", "higher-dev", "oracle-dev", "probe-eval", "replay", "norm-eval")
 INSERTED = 41
 CAP = 512
 DRAWS = 4
@@ -107,6 +107,20 @@ def donor_arms(layer, original, directions, group, short, torch):
     return kind
 
 
+def norm_matched_arms(original, old, group, torch):
+    n, b, left = (original[k].float() for k in ("native", "blank", "left"))
+    full, delta = left - n, left - b
+    seeds = [seed_for(x["row"]["id"], 0) for x in group]
+    vectors = {"full_donor": full, "blank_donor": b - n, "bracket_delta": delta,
+               "old_fixed": old.expand_as(full), "other_donor": left.roll(1, dims=0) - n,
+               "gaussian": gaussian(old, seeds, torch)}
+    budgets = {"blank_delta_norm": delta.norm(dim=-1, keepdim=True),
+               "full_donor_norm": full.norm(dim=-1, keepdim=True)}
+    return {f"{budget}:{name}": ("native", (n + vector * l2 /
+             vector.norm(dim=-1, keepdim=True).clamp_min(1e-12)).to(original["native"].dtype))
+            for budget, l2 in budgets.items() for name, vector in vectors.items()}
+
+
 def measure_patch(runtime, boundary, layer, packed, target, source, group, stats_base):
     with replace_first_position(layer, target):
         raw, _ = capture(runtime.model, packed, {}, use_cache=True)
@@ -175,7 +189,7 @@ def prefill_group(runtime, boundary, layers, group, phase, plan, direction):
         raw, state[k] = capture(runtime.model, packed, requested, use_cache=True)
         base[k] = stats(runtime, boundary, raw, group)
         parity_diff.extend(parity(runtime, packed, group, raw, base[k]))
-    tested, oracle, short = probe_specs(phase, plan, final)
+    tested, oracle, short = ((BLOCK,), False, False) if phase == "norm-eval" else probe_specs(phase, plan, final)
     rows = [{"kind": "probe", "id": x["row"]["id"], "stratum": x["stratum"],
              "eval_origin": x.get("eval_origin"), "render_sha256": x["render_sha256"], "batch_width": width,
              "prefix_sha256": {k: id_hash(v[i]) for k, v in pack_ids.items()},
@@ -191,13 +205,15 @@ def prefill_group(runtime, boundary, layers, group, phase, plan, direction):
             applied["receiver"] = receiver
             if receiver == "native":
                 applied["replacement"] = values[i].float().tolist()
-            if name == "other_donor":
+            if name.endswith("other_donor"):
                 applied["other_id"] = group[i-1]["row"]["id"]
             row["patches"][arm_name(layer, name)] = applied
 
     for layer in tested:
         original = {k: v[layer] for k, v in state.items()}
-        for name, (receiver, values) in donor_arms(layer, original, direction, group, short, torch).items():
+        interventions = (norm_matched_arms(original, direction, group, torch) if phase == "norm-eval" else
+                         donor_arms(layer, original, direction, group, short, torch))
+        for name, (receiver, values) in interventions.items():
             add(layer, name, receiver, values)
     if oracle:
         bound = plan["oracle_norm"]
@@ -351,7 +367,7 @@ def run(args):
     plan = load(plan_path) if plan_path.exists() else {}
     if args.phase == "oracle-dev":
         plan = load(root / "oracle-budget.json")
-    panel = "eval" if args.phase in ("probe-eval", "replay") else "dev"
+    panel = "eval" if args.phase in ("probe-eval", "replay", "norm-eval") else "dev"
     cases = cohort[panel]
     if args.smoke:
         cases = cases[:3]
