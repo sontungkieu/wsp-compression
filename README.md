@@ -428,6 +428,11 @@ continuation tokens and compares nested windows with a no-thinking run from
 the question. A teacher-forced probe measures the probability of one complete
 cycle under the original presence history.
 
+`repetition_qwen35_horizon.py` compares longer thinking rollouts for
+Qwen3.5-0.8B and Qwen3.5-2B on new numeric MATH-500 questions. It selects a
+common native cap from a disjoint timing pilot and limits the separately
+reported no-thinking baseline to 4,096 tokens.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
