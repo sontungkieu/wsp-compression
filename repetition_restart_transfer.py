@@ -61,18 +61,26 @@ class Qwen3Runtime(Runtime):
 
         if torch.cuda.device_count()!=1:
             raise ValueError("exactly one assigned GPU is required")
-        provenance = load(args.root/"checkpoint.json")
+        checkpoint = getattr(args,"checkpoint",None) or args.root/"checkpoint.json"
+        provenance = load(checkpoint)
         expected = provenance["expected_public_snapshot"]
         if verify_checkpoint(args.model,expected,weight_bytes=False)!=provenance["verified_files"]:
             raise ValueError("Qwen3 checkpoint differs from the byte-verified snapshot")
         self.torch,self.transformers = torch,transformers
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(args.model,local_files_only=True)
         self.groups = token_groups(self.tokenizer)
-        self.model = transformers.AutoModelForCausalLM.from_pretrained(
+        family = expected.get("family","qwen3")
+        if family == "qwen3":
+            auto, model_class = transformers.AutoModelForCausalLM, "Qwen3ForCausalLM"
+        elif family == "qwen3_5":
+            auto, model_class = transformers.AutoModelForImageTextToText, "Qwen3_5ForConditionalGeneration"
+        else:
+            raise ValueError("unsupported Qwen family")
+        self.model = auto.from_pretrained(
             args.model,local_files_only=True,dtype=torch.bfloat16
         ).to("cuda:0").eval()
-        if self.model.config.model_type!="qwen3" or type(self.model).__name__!="Qwen3ForCausalLM":
-            raise ValueError("transfer requires the pinned dense Qwen3 model")
+        if self.model.config.model_type!=family or type(self.model).__name__!=model_class:
+            raise ValueError("transfer checkpoint differs from the pinned model family")
         eos = self.model.generation_config.eos_token_id
         self.eos = set(eos if isinstance(eos,(list,tuple)) else [eos])
         chat = self.tokenizer.encode("<|im_end|>",add_special_tokens=False)
@@ -87,7 +95,8 @@ class Qwen3Runtime(Runtime):
                          if "use_model_defaults" in inspect.signature(self.model.generate).parameters else {})
         self.manifest = {"runtime":{"torch":str(torch.__version__),"transformers":transformers.__version__,
                                    "tokenizers":tokenizers.__version__},
-                         "checkpoint_revision":expected["revision"],"checkpoint_provenance_sha256":sha(args.root/"checkpoint.json"),
+                         "checkpoint_revision":expected["revision"],"checkpoint_provenance_sha256":sha(checkpoint),
+                         "model_type":family,"model_class":model_class,
                          "eos_ids":sorted(self.eos),"chat_end_id":chat[0],"pad_id":self.pad,
                          "think_end_id":self.groups["think"][0],"sampling":SAMPLING,
                          "tokenizer_sha256":provenance["verified_files"]["tokenizer.json"]}

@@ -409,6 +409,17 @@ budget. It freezes eligibility at each landmark, checks identical-source
 response parity, and separates the scratchpad source effect from the reader
 checkpoint effect.
 
+`repetition_checkpoint_replay.py` tests cache interventions on intermediate
+states written by the model. A simulator verifies the third step before the
+replay landmark. The analysis charges the reasoning tokens to the total
+budget and reports both eligible-state performance and full-panel policy
+performance with native fallback.
+
+`repetition_model_sizes.py` checks native thinking and no-thinking on the
+same MATH-500 questions across byte-verified Qwen checkpoints. It scores
+2,048 and 4,096 tokens from each rollout and uses model-specific closing and
+EOS tokens when measuring completion and repetition.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.

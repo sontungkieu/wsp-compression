@@ -5,6 +5,7 @@ from unittest.mock import patch
 from repetition_baseline import astra_instruction
 from repetition_cache_content_score import compare_values
 from repetition_cache_retention import content_pair, correctness
+from repetition_checkpoint_replay import checkpoint, make_panel
 from repetition_late_replay import cycle_landmarks, ends_in_motif
 from repetition_mediation import presence_scores
 from repetition_phase_trace import measurements, repeated_ngram_fraction
@@ -47,6 +48,27 @@ class TestRestartBudget(unittest.TestCase):
         result = correctness(example,{"tokens":[THINK_END,*map(ord,"zingo")],"eos_token":3},FakeTokenizer())
         self.assertFalse(result["correct_eos"])
         self.assertTrue(result["mentions_value_eos"])
+
+    def test_written_checkpoint_accepts_only_a_completed_early_line(self):
+        class FakeTokenizer:
+            def decode(self, ids, skip_special_tokens=False):
+                return "".join(chr(i) for i in ids)
+        tokenizer = FakeTokenizer()
+        prefix = "State 1 = 17\nState 2 = 85\nState 3 = 52\n"
+        text = prefix+"State 4 = 70\n"
+        self.assertEqual(checkpoint({"tokens":list(map(ord,text))},52,tokenizer),(len(prefix),"verified"))
+        bad = "State 3 = 521\nState 4 = 70\nState 3 = 52\n"
+        self.assertEqual(checkpoint({"tokens":list(map(ord,bad))},52,tokenizer),
+                         (None,"passed_step3_before_verified"))
+        post_marker = [THINK_END,*map(ord,prefix)]
+        self.assertIsNone(checkpoint({"tokens":post_marker},52,tokenizer)[0])
+
+    def test_written_checkpoint_split_is_disjoint_and_has_simulator_targets(self):
+        panel = make_panel()
+        pilot, test = panel["pilot"],panel["eval"]
+        self.assertEqual((len(pilot),len(test)),(8,32))
+        self.assertEqual(len({x["row"]["prompt"] for x in pilot+test}),40)
+        self.assertTrue(all(str(x["states"][-1])==x["row"]["gold"] for x in pilot+test))
 
     def test_content_sensitivity_cancels_a_lucky_identical_guess(self):
         case = {"task":"math","variants":{"plus":{"row":{"gold":"38"}},"minus":{"row":{"gold":"48"}}}}

@@ -105,7 +105,7 @@ def first_probe(runtime, group, notes, arm):
                 measures[label] = {"token":tok, "adjusted_logit":float(z[tok]),
                                    "rank_strict":int((z>z[tok]).sum())+1,
                                    "probability_after_filter":float(p[tok])}
-            notes[x["row"]["id"]][arm] = measures
+            notes[x["row"]["id"],x["state"]][arm] = measures
         return probabilities
     return probe
 
@@ -117,7 +117,7 @@ def run_batch(runtime, group, draw, cap, smoke):
     native = [x | {"presence_seed_ids":[]} for x in group]
     question, donor = prefill_donor(runtime, native)
     donor_sha = state_digest(donor, FIELDS, runtime.torch) if smoke else None
-    probes = {x["row"]["id"]:{} for x in group}
+    probes = {(x["row"]["id"],x["state"]):{} for x in group}
     outputs = {}
     for arm, batch in ((NATIVE,native),(HISTORY,group)):
         outputs[arm] = runtime.generate(batch,"native",draw,cap,packed=packed,
@@ -156,7 +156,8 @@ def run_batch(runtime, group, draw, cap, smoke):
                  "retained_history_size":len(set(x["completion_prefix"]))}
         for arm in ARMS:
             yield outputs[arm][i] | {"arm":arm,"state":x["state"],"cut":x["cut"],"proof":proof,
-                                     "render_sha256":x["render_sha256"],"probe":probes[pid].get(arm)}
+                                     "render_sha256":x["render_sha256"],
+                                     "probe":probes[pid,x["state"]].get(arm)}
 
 
 def emit_rollouts(args):
@@ -165,7 +166,9 @@ def emit_rollouts(args):
     cases = plan["cases"]
     smoke = args.phase == "smoke"
     if smoke:
-        cases = [next(x for x in cases if x["state"] == state) for state in (CONFIRM,"open_8192")]
+        confirm = next(x for x in cases if x["state"] == CONFIRM)
+        before = next(x for x in cases if x["state"] == BEFORE and x["row"]["id"] == confirm["row"]["id"])
+        cases = [before,confirm,next(x for x in cases if x["state"] == "open_8192")]
     else:
         # Keep the two draw landmarks for a question on the same device.
         pids = sorted({x["row"]["id"] for x in cases})[args.part::2]
@@ -308,7 +311,7 @@ class LateQueue(Supervisor):
             plan = load(self.root/"cohort.json")
             cases = {(x["row"]["id"],x["state"]):x for x in plan["cases"]}
             smoke,seconds = read_shard(path,digest,self.args.cohort_sha256,"smoke",64,cases)
-            if len(smoke) != 2*len(ARMS) or {x["state"] for x in smoke} != {CONFIRM,"open_8192"}:
+            if len(smoke) != 3*len(ARMS) or {x["state"] for x in smoke} != {BEFORE,CONFIRM,"open_8192"}:
                 raise ValueError("incomplete late replay canary")
             self.status("canary_passed",canary_sha256=digest,canary_seconds=seconds)
             results = self.run_batch("eval",[self.plan(i,"eval") for i in range(2)])

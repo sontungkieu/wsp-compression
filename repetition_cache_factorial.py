@@ -68,7 +68,7 @@ def freeze(parent, excluded, output):
     })
 
 
-def sample(runtime, group, draw, cap, canary):
+def sample(runtime, group, draw, cap, canary, *, swap_arms=tuple(SWAP)):
     torch = runtime.torch
     group = [x | {"presence_seed_ids":[]} for x in group]
     question,donor = prefill_donor(runtime,group)
@@ -76,7 +76,7 @@ def sample(runtime, group, draw, cap, canary):
     width = packed["input_ids"].shape[1]
     before = state_digest(donor,FIELDS,torch)
     traces,audits = {},{}
-    arms = (NATIVE,*SWAP,"self_copy") if canary else (NATIVE,*SWAP)
+    arms = (NATIVE,*swap_arms,"self_copy") if canary else (NATIVE,*swap_arms)
     for arm in arms:
         mode = "native" if arm==NATIVE else "self" if arm=="self_copy" else "swap"
         with marker_hook(runtime,width,mode,donor,digest_kv=True,fields=SWAP.get(arm,FIELDS)) as evidence:
@@ -91,7 +91,7 @@ def sample(runtime, group, draw, cap, canary):
             tokens(a)!=tokens(b) for a,b in zip(traces[NATIVE],traces["self_copy"],strict=True)
         ):
             raise ValueError("factorial self-copy differs from the native trace")
-    for arm in SWAP:
+    for arm in swap_arms:
         actual = audits[arm]["layers_changed"]
         if tuple(actual)!=SWAP[arm] or min(actual.values())<=0:
             raise ValueError(f"factorial swap did not execute as declared: {arm}")
