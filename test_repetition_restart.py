@@ -1,7 +1,9 @@
 """Regression checks for charging the abandoned trunk and matching restart cuts."""
 import unittest
+from unittest.mock import patch
 
 from repetition_baseline import astra_instruction
+from repetition_cache_retention import content_pair
 from repetition_mediation import presence_scores
 from repetition_phase_trace import measurements, repeated_ngram_fraction
 from repetition_restart import nested_restart, output_row, reaches_switch, score_policy
@@ -19,6 +21,20 @@ def result(ids, eos=None):
 
 
 class TestRestartBudget(unittest.TestCase):
+    def test_synthetic_pair_changes_only_the_scratchpad_value(self):
+        class FakeTokenizer:
+            def encode(self, text, add_special_tokens=False):
+                return list(map(ord,text))
+        with patch("repetition_cache_retention.render",return_value="<think>\n"):
+            pair = content_pair(FakeTokenizer(),"math","synthetic:1",("12","17"))
+        a,b = (pair["variants"][key] for key in ("plus","minus"))
+        self.assertEqual(a["row"]["prompt"],b["row"]["prompt"])
+        self.assertNotIn("12",a["row"]["prompt"])
+        self.assertNotIn("17",b["row"]["prompt"])
+        self.assertEqual((a["row"]["gold"],b["row"]["gold"]),("38","48"))
+        self.assertEqual(len(a["completion_prefix"]),len(b["completion_prefix"]))
+        self.assertEqual(len(pair["scaffold_changed_indices"]),1)
+
     def test_internal_cycle_is_distinguished_from_terminal_repetition(self):
         ids = list(range(7))*24+list(range(100,300))
         modes = measurements(ids)

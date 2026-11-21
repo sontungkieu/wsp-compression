@@ -388,6 +388,12 @@ Its switch analysis uses only tokens available at the fixed switch point.
 questions after a separate timing pilot and scores nested windows from
 2,048 tokens up to the selected 16,384- or 32,768-token horizon.
 
+`repetition_cache_retention.py` changes one checkpoint value in a
+token-length-matched synthetic scratchpad while holding the question fixed.
+It measures whether each cache treatment tracks both values in exact copy
+and arithmetic, and verifies that the question-only reference sees an
+identical input and produces an identical trace for each value pair.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
