@@ -393,6 +393,9 @@ token-length-matched synthetic scratchpad while holding the question fixed.
 It measures whether each cache treatment tracks both values in exact copy
 and arithmetic, and verifies that the question-only reference sees an
 identical input and produces an identical trace for each value pair.
+`repetition_cache_content_score.py` contrasts correct EOS for the observed
+value with correct EOS for the opposite value, so an identical lucky guess
+credits neither cache treatment nor the question-only reference.
 
 ## Interpretation
 

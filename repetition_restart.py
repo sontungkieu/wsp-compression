@@ -153,7 +153,7 @@ def score_policy(row, record, tokenizer, turn):
                                  pending_thought=requires_close)["exact_format"]
     return {"correct_eos":eos and a["numeric_correct"],"eos":eos,"wrong_eos":eos and a["answer_found"] and not a["numeric_correct"],
             "missing_eos":eos and not a["answer_found"],"cap":not eos,"strict_boxed":a["exact_format"],
-            "visible_boxed":strict_visible,"numeric_correct":a["numeric_correct"],"switched":record["switched"]}
+            "visible_boxed":strict_visible,"numeric_correct":a["numeric_correct"],"switched":record.get("switched",False)}
 
 
 if __name__=="__main__":

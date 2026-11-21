@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from repetition_baseline import astra_instruction
+from repetition_cache_content_score import compare_values
 from repetition_cache_retention import content_pair
 from repetition_mediation import presence_scores
 from repetition_phase_trace import measurements, repeated_ngram_fraction
@@ -21,6 +22,14 @@ def result(ids, eos=None):
 
 
 class TestRestartBudget(unittest.TestCase):
+    def test_content_sensitivity_cancels_a_lucky_identical_guess(self):
+        case = {"task":"math","variants":{"plus":{"row":{"gold":"38"}},"minus":{"row":{"gold":"48"}}}}
+        first = {"value":"38.0","eos":True}
+        second = {"value":"48","eos":True}
+        lucky = compare_values(case,[first,first])
+        self.assertEqual(lucky,{"own_correct_eos":1,"opposite_correct_eos":1,"sensitivity":0})
+        self.assertEqual(compare_values(case,[first,second])["sensitivity"],1)
+
     def test_synthetic_pair_changes_only_the_scratchpad_value(self):
         class FakeTokenizer:
             def encode(self, text, add_special_tokens=False):
@@ -111,6 +120,15 @@ class TestRestartBudget(unittest.TestCase):
         thinking = output_row(result([7], 9), "native", 5)
         self.assertTrue(score_policy({"gold": "42"}, direct, FakeTokenizer(), 99)["correct_eos"])
         self.assertFalse(score_policy({"gold": "42"}, thinking, FakeTokenizer(), 99)["correct_eos"])
+
+    def test_numeric_score_accepts_a_worker_without_a_switch_annotation(self):
+        class FakeTokenizer:
+            def decode(self, ids, skip_special_tokens=False):
+                return r"</think>\boxed{42}"
+        record = result([THINK_END,7],9) | {"arm":"fixed_switch"}
+        scored = score_policy({"gold":"42"},record,FakeTokenizer(),99)
+        self.assertTrue(scored["correct_eos"])
+        self.assertFalse(scored["switched"])
 
 
 if __name__ == "__main__":
