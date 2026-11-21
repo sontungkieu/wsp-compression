@@ -262,6 +262,29 @@ generated close tag normally and receive the same post-tag budget.
 only the known backspace-marker repair and reports paired contrasts
 without editing the original artifacts.
 
+`repetition_state_data.py` freezes native Qwen3.5 prefix cohorts by
+problem ID. It distinguishes verified loops, states before their onset,
+and ongoing reasoning without a detected cycle at the cut.
+`repetition_state_value.py` compares native continuation, closing on the
+next token (E0), and allowing up to 32 reasoning tokens before closing
+(E32). E0 and E32 share the post-close budget and per-problem/draw
+sampling stream. The success endpoint requires a correct numeric
+answer, EOS, and no terminal cycle. Exact boxed formatting and
+cap exhaustion are counted separately. The copy benchmark uses the
+Qwen chat turn terminator and scores the literal visible answer.
+
+`repetition_rank_one.py` learns a block-4 residual direction from
+matched dev prefixes and tests it on native prefixes. When that
+direction improves development success, `repetition_rank_fit.py` fits
+a no-intercept ridge gate to positive E0–E32 advantage with penalties
+at other token positions. `repetition_rank_eval.py` compares the gate
+with a bias calibrated on dev to a similar first-token close rate.
+All-token hooks and transient BF16 edits are gated on held-out success
+and checked against parity and a matched random edit. The supervisor
+`repetition_state_queue.py` records worker receipts and enforces its
+deadline. Its `--copy-only` mode runs copy calibration and held-out
+copy generation under a fresh output root.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
