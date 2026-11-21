@@ -331,7 +331,17 @@ numeric correctness with EOS from nested 256- and 512-token windows, with
 prompt-paired contrasts and the factorial interaction.
 `repetition_scratchpad_cap.py` freezes a hash-ranked subset of the factorial
 panel for 2,048-token cap sensitivity with reset presence history. It audits
-cross-run 512-token trace parity separately from the nested cap comparisons.
+cross-run 512-token trace parity separately from the nested cap comparisons and
+can tabulate paired terminal outcomes and revision of explicit boxed answers.
+
+`repetition_restart_cohort.py` freezes disjoint pilot and evaluation panels of
+numeric-answer problems. `repetition_restart_queue.py` compares native thinking,
+native no-thinking with the same sampler, a same-template immediate exit, and
+fixed-token switches with retained or discarded reasoning. The switch arms
+both reset presence history and preserve native outcomes when the model closes
+before the switch. Discarded reasoning still counts against the total budget.
+Pilot generation checks that a real restart matches a nested immediate-exit
+trace at the remaining budget before evaluation can reuse the nested trace.
 
 ## Interpretation
 

@@ -1,14 +1,16 @@
 """Freeze the cap-sensitivity subset and audit nested trajectories."""
 import argparse
 from collections import Counter
+from decimal import Decimal
 import json
 from pathlib import Path
 
-from repetition_baseline import sha
-from repetition_budget_score import cut
+from repetition_baseline import BOXED, DECIMAL, sha
+from repetition_budget_score import assess_window, cut
 from repetition_mediation_queue import load, save
 from repetition_scratchpad_score import DR, KR, read_matrix
 from repetition_state_data import STRATA, keyed, length_summary
+from repetition_state_value import THINK_END
 
 
 def freeze(source, output):
@@ -51,13 +53,72 @@ def compare(old_root, new_root, output):
     print(json.dumps(out))
 
 
+def boxed_diagnostic(ids, eos, turn, tokenizer, gold):
+    if THINK_END not in ids:
+        return False, False, False
+    after_close = len(ids)-ids[::-1].index(THINK_END)
+    answer = ids[after_close:]
+    if turn in answer:
+        answer = answer[:answer.index(turn)]
+    visible = tokenizer.decode(answer, skip_special_tokens=False)
+    values = [m.group(1).strip() for m in BOXED.finditer(visible)]
+    numeric = [Decimal(v.replace(",", "")) if DECIMAL.fullmatch(v) else None for v in values]
+    correct = [v == gold for v in numeric]
+    changed_to_wrong = False
+    seen_correct = False
+    for hit, value in zip(correct, numeric, strict=True):
+        changed_to_wrong |= seen_correct and value is not None and not hit
+        seen_correct |= hit
+    return seen_correct, bool(correct and correct[-1] and not eos), changed_to_wrong
+
+
+def audit_answers(root, output, tokenizer):
+    cases, raw, receipts, draws = read_matrix(root)
+    [turn] = tokenizer.encode("<|im_end|>", add_special_tokens=False)
+    windows = {}
+    for budget in (256, 512, 1024, 1536, 2048):
+        paired = Counter()
+        paired_box = Counter()
+        counts = {arm: Counter() for arm in (KR, DR)}
+        for p, case in cases.items():
+            row = case["row"]
+            gold = Decimal(row["gold"])
+            for draw in range(draws):
+                states, boxes = [], []
+                for arm in (KR, DR):
+                    record = raw[p, draw, arm]
+                    ids, eos = cut(record, "post", budget)
+                    y = assess_window(row, record, "post", budget, tokenizer, turn)
+                    ever, last_pending, changed = boxed_diagnostic(ids, eos, turn, tokenizer, gold)
+                    totals = counts[arm]
+                    totals["ever_correct_box"] += ever
+                    totals["last_correct_box_without_eos"] += last_pending
+                    totals["correct_box_later_wrong_box"] += changed
+                    totals["correct_without_eos"] += y["numeric_correct"] and not eos
+                    outcome = ("eos_correct" if y["eos_correct"] else "eos_wrong" if y["wrong_parsed_eos"]
+                               else "eos_missing" if eos else "no_eos_correct" if y["numeric_correct"] else "no_eos")
+                    states.append(outcome)
+                    boxes.append("correct_box" if ever else "no_correct_box")
+                paired[" -> ".join(states)] += 1
+                paired_box[" -> ".join(boxes)] += 1
+        windows[str(budget)] = {"arm_counts": counts, "keep_to_drop_outcome": paired,
+                                "keep_to_drop_ever_boxed_correct": paired_box}
+    if output.exists():
+        raise FileExistsError(output)
+    save(output, {"draws": draws, "prompts": len(cases), "verified_shards": receipts, "windows": windows})
+    print(json.dumps({"report_sha256": sha(output), "prompts": len(cases), "draws": draws}))
+
+
 if __name__=="__main__":
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("action",choices=("freeze","compare"))
-    for name in ("source","root","output"):
+    p.add_argument("action",choices=("freeze","compare","answer-audit"))
+    for name in ("source","root","output","model"):
         p.add_argument("--"+name,type=Path)
     a = p.parse_args()
     if a.action=="freeze":
         freeze(a.source,a.output)
-    else:
+    elif a.action=="compare":
         compare(a.source,a.root,a.output)
+    else:
+        from transformers import AutoTokenizer
+        audit_answers(a.root,a.output,AutoTokenizer.from_pretrained(a.model,local_files_only=True))
