@@ -26,7 +26,7 @@ def odds(logits, token, prior, torch):
     return z - scores.logsumexp(dim=-1)
 
 
-def capture(model, model_inputs, layers):
+def capture(model, model_inputs, layers, *, use_cache=False):
     captures = {}
     hooks = []
 
@@ -38,7 +38,7 @@ def capture(model, model_inputs, layers):
     try:
         for index, module in layers.items():
             hooks.append(module.register_forward_hook(hook(index)))
-        logits = model(**model_inputs, use_cache=False, logits_to_keep=1).logits[:, -1]
+        logits = model(**model_inputs, use_cache=use_cache, logits_to_keep=1).logits[:, -1]
     finally:
         for registration in hooks:
             registration.remove()

@@ -94,14 +94,17 @@ def make_timing_policy(torch, transformers, groups):
             return sampled
 
     class PostBudget(transformers.StoppingCriteria):
-        def __init__(self, width, cap):
+        def __init__(self, width, cap, reasoning_cap=None):
             self.width, self.cap = width, cap
+            self.reasoning_cap = reasoning_cap
 
         def __call__(self, ids, scores, **kwargs):
             part = ids[:, self.width:]
             marker = part == THINK_END
             first = marker.to(torch.int32).argmax(-1)
-            return marker.any(-1) & ((part.shape[1] - first - 1) >= self.cap)
+            closed = marker.any(-1)
+            stop = closed & ((part.shape[1] - first - 1) >= self.cap)
+            return stop if self.reasoning_cap is None else stop | (~closed & (part.shape[1] >= self.reasoning_cap))
 
     return TimingPolicy, PostBudget
 
@@ -145,28 +148,38 @@ class Runtime:
     def pack(self, ids):
         return padded(ids, self.pad, self.torch)
 
-    def generate(self, batch, arm, draw, cap, hook=nullcontext(), bias=0.):
+    def generate(self, batch, arm, draw, cap, hook=nullcontext(), bias=0., *,
+                 packed=None, first_transform=None, matched_budget=False):
         no_think = arm == "no_think"
         exit_at = 0 if arm == "e0" else 32 if arm == "e32" else None
         is_copy = batch[0]["row"]["task"] == "copy"
         if any((x["row"]["task"] == "copy") != is_copy for x in batch):
             raise ValueError("copy and math require separate generation batches")
         stop_ids = self.copy_eos if is_copy else self.eos
-        packed = self.pack([x["no_think_ids"] if no_think else x["native_ids"] for x in batch])
+        if packed is None:
+            packed = self.pack([x["no_think_ids"] if no_think else x["native_ids"] for x in batch])
         width = packed["input_ids"].shape[1]
         seeds = [seed_for(x["row"]["id"], draw) for x in batch]
         post = [post_seed(x["row"]["id"], draw) for x in batch]
         sampler = self.policy(batch, width, seeds, post, exit_at, bias)
+        sampler.first_transform = first_transform
         total = cap if exit_at is None else cap + exit_at + 1
+        if matched_budget and exit_at is None:
+            total = 2 * cap
         cfg = self.transformers.GenerationConfig(do_sample=False, use_cache=True, max_new_tokens=total,
                                                   eos_token_id=sorted(stop_ids), pad_token_id=self.pad)
         criteria = [self.stop_after(width, cap)] if exit_at is not None else None
+        if matched_budget and exit_at is None:
+            criteria = [self.stop_after(width, cap, reasoning_cap=cap)]
         with hook:
             out = self.model.generate(**packed, generation_config=cfg, logits_processor=[sampler],
                                       stopping_criteria=criteria, **self.defaults)
         results = []
         for i, (x, ids) in enumerate(zip(batch, out[:, width:].tolist(), strict=True)):
-            ids_no_eos, stop = generated_span(ids, stop_ids, cap if exit_at is not None else None)
+            if matched_budget and exit_at is None and THINK_END not in ids[:cap]:
+                ids = ids[:cap]
+            post_cap = cap if matched_budget or exit_at is not None else None
+            ids_no_eos, stop = generated_span(ids, stop_ids, post_cap)
             at = ids_no_eos.index(THINK_END) if THINK_END in ids_no_eos else None
             if exit_at is not None and (at is None and stop is None or at is not None and at > exit_at):
                 raise ValueError("timing arm violated the requested closure")
@@ -190,6 +203,8 @@ class Runtime:
                             "copy_error": copy_error(output, row["gold"], eligible, stop is not None, exact)}
             if exit_at is not None:
                 assessed["cap"] = stop is None and post_len == cap
+            elif matched_budget:
+                assessed["cap"] = stop is None and (post_len == cap or at is None and len(ids_no_eos) == cap)
             results.append({"kind": "rollout", "id": row["id"], "arm": arm, "draw": draw, "tokens": ids_no_eos,
                             "seed": seeds[i], "post_seed": post[i], "eos_token": stop,
                             "first_think_mass": sampler.first_step["think"][i],

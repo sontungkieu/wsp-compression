@@ -109,6 +109,7 @@ def processor_factory(torch, transformers, groups):
                 raise ValueError("each receiver needs exactly one random stream")
             self.force_first = force_first
             self.first_step = None
+            self.first_transform = None
 
         def __call__(self, ids, scores):
             history = ids[:self.n, self.width:]
@@ -128,6 +129,8 @@ def processor_factory(torch, transformers, groups):
             sampled = top_p(ids[:self.n], top_k(ids[:self.n], result))
             probabilities = sampled.softmax(dim=-1)
             if self.first_step is None:
+                if self.first_transform is not None:
+                    probabilities = self.first_transform(probabilities, base)
                 raw = base.softmax(dim=-1)
                 mixed = result.softmax(dim=-1)
                 self.first_step = {

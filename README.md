@@ -287,6 +287,19 @@ copy generation under a fresh output root. To test sensitivity to the
 timing cap, freeze an eval-only cohort with a `labels_cap` between 512
 and 2048, run the timing smoke on that cohort, and use `--eval-and-copy`.
 
+`repetition_sampler_queue.py` runs the native sampler reachability
+diagnostic. Its cohort builder keeps the dev panel separate and selects
+fresh canonical prefix IDs before falling back to previously reported
+holdout IDs. Prefill compares native, blank, and bracket contexts and
+last-token donor patches using the original presence penalty, temperature,
+and Transformers filters. It records verified brackets for entry into
+support and marker probability 0.5. The queue freezes up to two native
+activation candidates on dev, then runs held-out prefill and paired replay.
+Replay compares each activation with a first-step decoder control that
+matches the marker probability and preserves native non-marker conditionals.
+The native and patched policies share 512-token reasoning and post-close
+budgets. All runs record per-prompt hashes and shard receipts.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
