@@ -7,6 +7,7 @@ from repetition_cache_content_score import compare_values
 from repetition_cache_retention import content_pair, correctness
 from repetition_checkpoint_replay import checkpoint, checkpoint_in_step, make_panel
 from repetition_late_budget import fallback_policy, probability_product
+from repetition_late_confirmation import INCREMENT, LATEST, TOTAL, first_trigger, score_cut
 from repetition_late_replay import cycle_landmarks, ends_in_motif
 from repetition_mediation import presence_scores
 from repetition_phase_trace import measurements, repeated_ngram_fraction
@@ -64,6 +65,25 @@ class TestRestartBudget(unittest.TestCase):
         }
         y = fallback_policy(traces,case,2048,FakeTokenizer(),99)
         self.assertEqual((y["correct_eos"],y["wrong_eos"],y["restarted"],y["used"]),(1,1,1,1029))
+
+    def test_confirmation_trigger_uses_only_the_allowed_thinking_prefix(self):
+        motif = [12,13]*65
+        self.assertIsNone(first_trigger({"tokens":motif},THINK_END,limit=127))
+        self.assertEqual(first_trigger({"tokens":motif},THINK_END,limit=128),128)
+        closed = motif[:110]+[THINK_END]+motif
+        self.assertIsNone(first_trigger({"tokens":closed},THINK_END))
+
+    def test_full_policy_charges_prefix_and_eos_to_the_same_budget(self):
+        class FakeTokenizer:
+            def decode(self, ids, skip_special_tokens=False):
+                return "".join({THINK_END:"</think>",1:r"\boxed{17}",2:" "}[i] for i in ids)
+        raw = {"arm":"conv_only","tokens":[THINK_END,1]+[2]*(INCREMENT-3),"eos_token":8}
+        final = score_cut({"gold":"17"},raw,INCREMENT,FakeTokenizer(),99,spent=LATEST)
+        self.assertTrue(final["correct_eos"])
+        self.assertEqual(final["generated_tokens"],TOTAL)
+        early = score_cut({"gold":"17"},raw,INCREMENT-1,FakeTokenizer(),99,spent=LATEST)
+        self.assertFalse(early["eos"])
+        self.assertEqual(early["generated_tokens"],TOTAL-1)
 
     def test_retention_copy_mention_does_not_change_exact_match(self):
         class FakeTokenizer:

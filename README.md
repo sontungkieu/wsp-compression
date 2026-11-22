@@ -439,6 +439,12 @@ the paired convolution refresh effect at 1,024 continuation tokens. A
 secondary policy spends the unused budget on a direct answer when the
 convolution replay reaches 1,024 tokens without EOS.
 
+`repetition_late_confirmation.py` locks a fresh numeric MATH-500 panel,
+checks the runtime against a disjoint timing pilot, and runs the original
+horizon and replay workers. It scores continuation accuracy on trigger
+cases and simulates the whole-panel intervention at a fixed total token
+budget when every trigger case has verified replay results.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
