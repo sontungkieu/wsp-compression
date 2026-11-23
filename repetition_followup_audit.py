@@ -1,9 +1,10 @@
 """Audit factorial retention and replay timing on a shared prompt cohort."""
 import argparse
-from collections import defaultdict
+from collections import Counter, defaultdict
+import json
 from pathlib import Path
 
-from repetition_baseline import sha
+from repetition_baseline import math_answer, sha
 from repetition_canonical import paired_interval
 from repetition_followup_aggregate import contrast, submitted_scores, tally
 from repetition_mediation_queue import load, save
@@ -34,6 +35,52 @@ def information_factorial(items):
                         "trials":sum(map(len,estimates.values())),
                         "both_values_eos":{a:sum(sum(y[a]) for y in data.values()) for a in FACTOR_ARMS}}
     return result
+
+
+def information_rows(root,status,scores,panel,model):
+    from transformers import AutoTokenizer
+    tok=AutoTokenizer.from_pretrained(model,local_files_only=True)
+    gold={(item["id"],variant):cell["row"] for item in load(panel)["panels"]["eval"]
+          for variant,cell in item["cells"].items()}
+    rows=defaultdict(dict)
+    raw_shas={}
+    for scorer, result in scores.items():
+        parent=scorer.removesuffix("-score")
+        raw=root/"jobs"/(parent+".jsonl")
+        digest=status["jobs"][parent]["sha256"]
+        if sha(raw)!=digest or result["raw_sha256"]!=digest:
+            raise ValueError("C2 raw file differs from its scored receipt")
+        raw_shas[parent]=digest
+        with raw.open() as stream:
+            head,*body,end=map(json.loads,stream)
+        if head["panel_sha256"]!=sha(panel) or end["kind"]!="complete" or head["split"]!="eval":
+            raise ValueError("C2 row audit does not match the frozen evaluation panel")
+        for trace in body:
+            if trace["kind"]!="rollout":
+                continue
+            p,d,v,a=(trace[k] for k in ("id","draw","variant","arm"))
+            key=p,d,v
+            if a in rows[key]:
+                raise ValueError("duplicate C2 rollout in row audit")
+            text=tok.decode(trace["tokens"],skip_special_tokens=False)
+            score=math_answer(gold[p,v],text)
+            correct,found=score["numeric_correct"],score["answer_found"]
+            eos=trace["eos_token"] is not None
+            rows[key][a]={"correct_eos":correct and eos,"wrong_eos":found and not correct and eos,
+                          "missing_eos":not found and eos,"correct_without_eos":correct and not eos,"cap":not eos}
+    totals=defaultdict(lambda:defaultdict(Counter))
+    pairs=defaultdict(lambda:defaultdict(list))
+    for (prompt,_,_),arms in rows.items():
+        _,family,_=prompt.split(":")
+        if not set(FACTOR_ARMS)<=arms.keys():
+            raise ValueError("C2 row is missing a factorial arm")
+        base,conv,matrix,both=(int(arms[arm]["correct_eos"]) for arm in FACTOR_ARMS)
+        for group in ("pooled",family):
+            pairs[group][prompt].append(both-conv-matrix+base)
+            for arm,outcome in arms.items():
+                totals[group][arm].update(outcome | {"n":1})
+    return {"raw_sha256":raw_shas,"groups":{
+        g:{"arms":totals[g],"correct_eos_interaction":paired_interval(pair)} for g,pair in pairs.items()}}
 
 
 def replay_intersection(items):
@@ -70,6 +117,8 @@ def main():
     cli.add_argument("mode",choices=("information","amc"))
     cli.add_argument("--root",type=Path,required=True)
     cli.add_argument("--output",type=Path,required=True)
+    cli.add_argument("--panel",type=Path)
+    cli.add_argument("--model",type=Path)
     args=cli.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
@@ -83,6 +132,8 @@ def main():
     output={"mode":args.mode,"worker_sha256":sha(Path(__file__)),
             "score_receipts":{k:ref["jobs"][k]["sha256"] for k in scores},
             "results":compute(scores.values())}
+    if args.mode=="information" and args.panel and args.model:
+        output["row_audit"]=information_rows(args.root,ref,scores,args.panel,args.model)
     save(args.output,output)
 
 
