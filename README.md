@@ -467,6 +467,8 @@ refreshing convolutional cache state or answering directly from the question.
 with two operations and scores all four outputs against exact numeric
 answers. Its optional zero-convolution arm clears only the convolutional
 state at the marker and verifies that the attention KV remains unchanged.
+`repetition_followup_evidence.py` reuses the original fresh-evidence
+trajectories and pairs them with a direct instruction to use the same record.
 `repetition_followup_astra.py` verifies exact published BF16 tensor
 replacements and compares native and fixed-marker math with a separate
 copy and formatting check. `repetition_followup_plan.py` admits the

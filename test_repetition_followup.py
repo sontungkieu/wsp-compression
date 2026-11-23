@@ -4,6 +4,7 @@ from unittest.mock import patch
 from repetition_followup_aggregate import reject_rate, risk_match
 from repetition_followup_astra import context
 from repetition_followup_baseline import consensus, scheme
+from repetition_followup_evidence import new_row
 from repetition_followup_information import check_question_only
 from repetition_followup_timing import decisions
 
@@ -43,6 +44,15 @@ class FollowupTest(unittest.TestCase):
         self.assertEqual([x["row"]["id"] for x in all_rows],["open","closed"])
         self.assertEqual(len(fixed),1)
         self.assertEqual(fixed[0]["completion_prefix"],[5]*512)
+
+    def test_record_instruction_keeps_the_operation_and_verbatim_evidence(self):
+        old={"id":"a","gold":"41","prompt":"An integer counter snapshot was recorded in the scratchpad. "
+             "Double the snapshot.\nVerified record: Counter snapshot is 20.5.\nAnswer in a box."}
+        revised=new_row({"evidence_row":old})
+        self.assertEqual(revised["row"]["prompt"],"Use the verified checkpoint record below. "
+                         "Double the snapshot.\nVerified record: Counter snapshot is 20.5.\nAnswer in a box.")
+        self.assertEqual(revised["row"]["gold"],old["gold"])
+        self.assertEqual(revised["completion_prefix"],[])
 
     def test_thinning_keeps_cost_and_matches_dev_coverage_and_risk_when_feasible(self):
         correct={"answered":True,"correct_eos":True,"wrong_eos":False,"cost":37}
