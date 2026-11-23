@@ -462,6 +462,8 @@ token budget each. `repetition_followup_timing.py` replays native prefixes
 at locked positions or at the first confirmed exact cycle, with token
 cost counted from the original question. It tests keeping the prefix,
 refreshing convolutional cache state or answering directly from the question.
+The optional zero-convolution replay measures whether a zero reset reproduces
+the effect of restoring the question-only convolutional state.
 
 `repetition_followup_information.py` crosses two hidden checkpoint values
 with two operations and scores all four outputs against exact numeric

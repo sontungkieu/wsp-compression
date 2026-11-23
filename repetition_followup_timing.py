@@ -8,7 +8,7 @@ import time
 from repetition_baseline import first_recurrent, render, sha
 from repetition_budget_run import packed_hash, tokens
 from repetition_budget_score import cut
-from repetition_cache_factorial import CONV, NATIVE, sample
+from repetition_cache_factorial import CONV, NATIVE, ZERO_CONV, sample
 from repetition_canonical import paired_interval, seed_for
 from repetition_followup_baseline import runtime_for, verified
 from repetition_late_confirmation import INCREMENT, LATEST, TOTAL
@@ -89,9 +89,10 @@ def run(a):
     with partial.open("x") as f,r.torch.inference_mode():
         def emit(value):
             print(json.dumps(value,allow_nan=False),file=f,flush=True)
+        arms=ARMS+((ZERO_CONV,) if a.zero_conv else ())
         emit({"kind":"manifest","anchor":a.anchor,"source":str(a.raw),"baseline_sha256":a.fingerprint,
               "dataset":head["dataset"],"split":head["split"],"panel_sha256":sha(a.panel),
-              "worker_sha256_timing":sha(Path(__file__)),"arms":ARMS,"cap":a.cap,"draws":a.draws,
+              "worker_sha256_timing":sha(Path(__file__)),"arms":arms,"cap":a.cap,"draws":a.draws,
               "marker":marker,"turn":head["turn"],"eligible":len(items),"panel_size":len(rows),**r.manifest})
         start=time.monotonic()
         for i in range(0,len(items),a.batch):
@@ -111,10 +112,11 @@ def run(a):
             for draw in range(a.draws):
                 if time.time()>=a.deadline-150:
                     raise TimeoutError("timing draw reached reserved end window")
-                outs,audit=sample(r,group,draw,a.cap-1,a.canary,swap_arms=(CONV,),question_only=False)
+                outs,audit=sample(r,group,draw,a.cap-1,a.canary,swap_arms=(CONV,),question_only=False,
+                                  zero_conv=a.zero_conv)
                 outs[DIRECT]=r.generate(question,"no_think",draw,a.cap,packed=packed,start_after_marker=True)
                 emit({"kind":"audit","draw":draw,"cache":audit,"ids":list(evidence)})
-                for arm in ARMS:
+                for arm in arms:
                     for trace in outs[arm]:
                         emit(trace|{"arm":arm,"prefix_sha256":evidence[trace["id"]]["prefix_sha256"]})
         emit({"kind":"complete","seconds":time.monotonic()-start})
@@ -132,6 +134,9 @@ def report(path,fingerprint,panel,model):
         raise ValueError("timing worker or panel proof changed")
     _,rows,base,_=verified(Path(h["source"]),h["baseline_sha256"],panel)
     budget=h["cap"]
+    recorded=tuple(h["arms"])
+    if recorded not in (ARMS,(*ARMS,ZERO_CONV)):
+        raise ValueError("unknown timing replay arm")
     cases={x["row"]["id"]:x for x in prefix_cases(rows,base,h["marker"],h["anchor"],budget)}
     tok=AutoTokenizer.from_pretrained(model,local_files_only=True)
     features={r["id"]:r for r in body if r["kind"]=="feature"}
@@ -149,7 +154,7 @@ def report(path,fingerprint,panel,model):
                or (r["eos_token"] is not None and r["eos_token"] not in h["eos_ids"])):
             raise ValueError("invalid timing branch")
         raw[p,d,a]=r
-    if raw.keys()!={(p,d,a) for p in cases for d in range(h["draws"]) for a in ARMS}:
+    if raw.keys()!={(p,d,a) for p in cases for d in range(h["draws"]) for a in recorded}:
         raise ValueError("timing raw matrix incomplete")
     windows=sorted({512,1024,INCREMENT,budget})
     cells,counts={},{str(c):{} for c in windows}
@@ -159,7 +164,7 @@ def report(path,fingerprint,panel,model):
         entry={"prefix_tokens":at,"features":learned,"arms":{}}
         for cap in windows:
             arms={}
-            for a in ARMS:
+            for a in recorded:
                 arms[a]=[]
                 for draw in range(h["draws"]):
                     r=raw[p,draw,a]
@@ -174,12 +179,15 @@ def report(path,fingerprint,panel,model):
             entry["arms"][str(cap)]=arms
         cells[p]=entry
     for k in counts:
-        for a in (*ARMS,"native_suffix"):
+        for a in (*recorded,"native_suffix"):
             v=[r for y in cells.values() for r in y["arms"][k][a]]
             counts[k][a]={"n":len(v),**{m:sum(bool(r[m]) for r in v) for m in ("correct_eos","wrong_eos","missing_eos","cap")},
                            "tokens_from_start":sum(r["cost_from_start"] for r in v)}
         counts[k]["conv_minus_keep"]=paired_interval({p:[int(x["correct_eos"])-int(y["correct_eos"])
                          for x,y in zip(v["arms"][k][CONV],v["arms"][k][NATIVE],strict=True)] for p,v in cells.items()}) if cells else None
+        if ZERO_CONV in recorded:
+            counts[k]["zero_minus_keep"]=paired_interval({p:[int(x["correct_eos"])-int(y["correct_eos"])
+                         for x,y in zip(v["arms"][k][ZERO_CONV],v["arms"][k][NATIVE],strict=True)] for p,v in cells.items()}) if cells else None
     return {"header":h,"eligible":len(cases),"excluded":len(rows)-len(cases),"counts":counts,
             "items":cells,"worker_seconds":end["seconds"],"raw_sha256":fingerprint}
 
@@ -194,6 +202,7 @@ def main():
     for name,default in (("draws",2),("batch",4),("deadline",None),("cap",INCREMENT)):
         p.add_argument("--"+name,type=int,default=default)
     p.add_argument("--canary",action="store_true")
+    p.add_argument("--zero-conv",action="store_true")
     a=p.parse_args()
     if a.action=="run":
         run(a)

@@ -112,12 +112,15 @@ def joint_policy(baseline,replay,anchor,window=2048):
         if not refs["direct_agreement"]:
             del refs["direct_agreement"]
         coarse={arm:{p:[outcome] for p,outcome in rows.items()} for arm,rows in refs.items()}
-        for arm in REPLAY[:3]:
+        interventions=(*REPLAY[:3],"zero_conv") if active and all(
+            "zero_conv" in y["arms"][str(window)] for y in active.values()) else REPLAY[:3]
+        for arm in interventions:
             coarse["trigger_"+arm]={p:[active[p]["arms"][str(window)][arm][0]] if p in active else [n]
                                     for p,n in refs["native"].items()}
         oracle={}
         for p,native in refs["native"].items():
-            options=[native] if p not in active else [active[p]["arms"][str(window)][arm][0] for arm in REPLAY]
+            options=[native] if p not in active else [
+                active[p]["arms"][str(window)][arm][0] for arm in (*interventions,"native_suffix")]
             oracle[p]=max(options,key=lambda x:(x["correct_eos"],-int(x["wrong_eos"]),-x.get("cost_from_start",0)))
         result[split]={"covered":len(covered),"triggers":len(active),"cells":coarse,"oracle":tally(oracle.values())}
     if "eval" not in result:
@@ -129,6 +132,8 @@ def joint_policy(baseline,replay,anchor,window=2048):
          "conv_minus_keep":contrast(cells["trigger_conv_only"],cells["trigger_native"]),
          "conv_minus_direct_from_start":contrast(cells["trigger_conv_only"],cells["no_think"]),
          "estimand":"replay-simulated draw0 policy, counted from the original question"}
+    if "trigger_zero_conv" in cells:
+        out["zero_minus_keep"]=contrast(cells["trigger_zero_conv"],cells["trigger_native"])
     if "dev" in result:
         dev=result["dev"]["cells"]
         control={k:{p:v[0] for p,v in dev[k].items()} for k in ("no_think","direct_agreement") if k in dev}
@@ -145,9 +150,9 @@ def replay_results(scores):
     by_split=defaultdict(list)
     for data in scores:
         h=data["header"]
-        by_split[(h["dataset"],h["split"],h["anchor"],h["cap"],len(data["counts"]))].append(data)
+        by_split[(h["dataset"],h["split"],h["anchor"],h["cap"],tuple(h["arms"]))].append(data)
     out={}
-    for (dataset,split,anchor,cap,_),records in sorted(by_split.items()):
+    for (dataset,split,anchor,cap,observed_arms),records in sorted(by_split.items()):
         cells={}
         for record in records:
             if cells.keys()&record["items"].keys():
@@ -155,10 +160,12 @@ def replay_results(scores):
             cells.update(record["items"])
         stats={}
         for budget in records[0]["counts"]:
-            arms={arm:{p:v["arms"][budget][arm] for p,v in cells.items()} for arm in REPLAY}
+            arms={arm:{p:v["arms"][budget][arm] for p,v in cells.items()} for arm in (*observed_arms,"native_suffix")}
             stats[budget]={"arms":{a:tally(y for v in group.values() for y in v) for a,group in arms.items()},
                            "conv_minus_keep":contrast(arms["conv_only"],arms["native"]),
                            "conv_minus_fresh":contrast(arms["conv_only"],arms["no_think"])}
+            if "zero_conv" in arms:
+                stats[budget]["zero_minus_keep"]=contrast(arms["zero_conv"],arms["native"])
         out[f"{dataset}/{split}/{anchor}/{cap}"]={"eligible":len(cells),
                 "excluded":sum(d["excluded"] for d in records),"budgets":stats}
     return out
@@ -217,7 +224,7 @@ def astra_results(scores):
 def summarize(root,status):
     sections={x:[] for x in ("baseline","replay","information","astra")}
     base_by_split=defaultdict(dict)
-    replay_by_split=defaultdict(list)
+    replay_by_split=defaultdict(lambda:defaultdict(list))
     scores=submitted_scores(root,status)
     for name,item in scores.items():
         if "canary" in name:
@@ -225,16 +232,18 @@ def summarize(root,status):
         h=item["header"]
         if "worker_sha256_timing" in h:
             sections["replay"].append(item)
-            if h["dataset"]=="math500" and h["cap"]==2048:
-                replay_by_split[h["split"],h["anchor"]].append(item)
+            if h["cap"]==2048:
+                replay_by_split[h["dataset"]][h["split"],h["anchor"]].append(item)
         elif "worker_sha256_astra" in h:
             sections["astra"].append(item)
         elif "worker_sha256_information" in h:
             sections["information"].append(item)
         else:
             sections["baseline"].append(item)
-            if name.startswith("A-math500-") and "16384" in item["windows"]:
-                base_by_split[h["split"]][name.removesuffix("-score")]=item["windows"]["16384"]["cells"]
+            if (name.startswith(("A-math500-","N-qwen35-08b-amc_val-"))
+                    and h["scheme"][0][1:]==[0,16384] and "16384" in item["windows"]):
+                splits=base_by_split.setdefault(h["dataset"],defaultdict(dict))
+                splits[h["split"]][name.removesuffix("-score")]=item["windows"]["16384"]["cells"]
     totals=defaultdict(Counter)
     for item in sections["baseline"]:
         h=item["header"]
@@ -255,7 +264,8 @@ def summarize(root,status):
             "score_receipts":{k:status["jobs"][k]["sha256"] for k in scores},
             "baseline":totals,"timing":replay_results(sections["replay"]),
             "information":information_results(sections["information"]),"astra":astra_results(sections["astra"]),
-            "policies":{anchor:joint_policy(base_by_split,replay_by_split,anchor) for anchor in ("512","2048","exact")}}
+            "policies":{dataset:{anchor:joint_policy(splits,replay_by_split[dataset],anchor)
+                                  for anchor in ("512","2048","exact")} for dataset,splits in base_by_split.items()}}
 
 
 def main():
