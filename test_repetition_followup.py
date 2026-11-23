@@ -4,7 +4,7 @@ from unittest.mock import patch
 from repetition_followup_aggregate import reject_rate, risk_match
 from repetition_followup_astra import context
 from repetition_followup_baseline import consensus, scheme
-from repetition_followup_evidence import new_row
+from repetition_followup_evidence import evaluate_evidence, new_row
 from repetition_followup_information import check_question_only
 from repetition_followup_timing import decisions
 
@@ -53,6 +53,13 @@ class FollowupTest(unittest.TestCase):
                          "Double the snapshot.\nVerified record: Counter snapshot is 20.5.\nAnswer in a box.")
         self.assertEqual(revised["row"]["gold"],old["gold"])
         self.assertEqual(revised["completion_prefix"],[])
+
+    def test_evidence_scores_numeric_completion_after_forced_marker(self):
+        row={"gold":"41","boxed_answer_required":True}
+        self.assertTrue(evaluate_evidence(row,"</think>\\boxed{41}",True)["correct_eos"])
+        self.assertTrue(evaluate_evidence(row,"</think>\\boxed{40}",True)["wrong_eos"])
+        self.assertTrue(evaluate_evidence(row,"</think>UNKNOWN",True)["unknown"])
+        self.assertFalse(evaluate_evidence(row,"\\boxed{41}",True)["correct_eos"])
 
     def test_thinning_keeps_cost_and_matches_dev_coverage_and_risk_when_feasible(self):
         correct={"answered":True,"correct_eos":True,"wrong_eos":False,"cost":37}

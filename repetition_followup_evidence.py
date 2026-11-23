@@ -80,13 +80,23 @@ def run(args):
     temp.replace(args.output)
 
 
-def report(path,fingerprint,panel,model):
+def evaluate_evidence(row,text,eos):
+    result=math_answer(row,text)
+    answer=text.rpartition("</think>")[2]
+    return {"correct_eos":eos and result["numeric_correct"],
+            "wrong_eos":eos and result["answer_found"] and not result["numeric_correct"],
+            "missing_eos":eos and not result["answer_found"],"cap":not eos,
+            "unknown":not result["numeric_correct"] and re.search(r"\bunknown\b",answer,re.I) is not None}
+
+
+def report(path,fingerprint,panel,model,source_worker_sha=None):
     from transformers import AutoTokenizer
     if sha(path)!=fingerprint:
         raise ValueError("revised evidence shard checksum mismatch")
     with path.open() as stream:
         head,*records,end=map(json.loads,stream)
-    if (head["panel_sha256"]!=sha(panel) or head["worker_sha256_evidence"]!=sha(Path(__file__))
+    worker_sha=source_worker_sha or sha(Path(__file__))
+    if (head["panel_sha256"]!=sha(panel) or head["worker_sha256_evidence"]!=worker_sha
             or end["kind"]!="complete"):
         raise ValueError("revised evidence actor mismatch")
     tok=AutoTokenizer.from_pretrained(model,local_files_only=True)
@@ -107,13 +117,9 @@ def report(path,fingerprint,panel,model):
         for (p,d,v),trace in sorted(raw.items()):
             if trace["tokens"][0]!=head["marker"] or (trace["eos_token"] is not None and trace["eos_token"] not in head["eos_ids"]):
                 raise ValueError("evidence marker or EOS is invalid")
-            answer=tok.decode(trace["tokens"][1:],skip_special_tokens=False)
-            result=math_answer(gold[p,v],answer)
+            text=tok.decode(trace["tokens"],skip_special_tokens=False)
             eos=trace["eos_token"] is not None
-            cells[arm].setdefault(p,[]).append({"draw":d,"variant":v,"correct_eos":eos and result["numeric_correct"],
-                "wrong_eos":eos and result["answer_found"] and not result["numeric_correct"],
-                "missing_eos":eos and not result["answer_found"],"cap":not eos,
-                "unknown":not result["numeric_correct"] and re.search(r"\bunknown\b",answer,re.I) is not None})
+            cells[arm].setdefault(p,[]).append({"draw":d,"variant":v,**evaluate_evidence(gold[p,v],text,eos)})
     metrics={a:{k:sum(x[k] for group in by_id.values() for x in group)
                 for k in ("correct_eos","wrong_eos","missing_eos","cap","unknown")} for a,by_id in cells.items()}
     both={}
@@ -134,6 +140,7 @@ def main():
     for name in ("panel","raw","model","data","checkpoint","output"):
         p.add_argument("--"+name,type=Path)
     p.add_argument("--fingerprint")
+    p.add_argument("--source-worker-sha256")
     p.add_argument("--deadline",type=int)
     args=p.parse_args()
     if args.action=="run":
@@ -141,7 +148,7 @@ def main():
     else:
         if args.output.exists():
             raise FileExistsError(args.output)
-        save(args.output,report(args.raw,args.fingerprint,args.panel,args.model))
+        save(args.output,report(args.raw,args.fingerprint,args.panel,args.model,args.source_worker_sha256))
 
 
 if __name__=="__main__":
