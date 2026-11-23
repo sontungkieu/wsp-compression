@@ -445,6 +445,12 @@ horizon and replay workers. It scores continuation accuracy on trigger
 cases and simulates the whole-panel intervention at a fixed total token
 budget when every trigger case has verified replay results.
 
+`repetition_external_panel.py` converts a checksum-pinned public numeric
+dataset such as SVAMP or Numina AMC into the follow-up panel schema. It
+preserves the dataset revision and split, excludes exact normalized
+problem matches from supplied source files and archived cohort manifests,
+and freezes disjoint development and evaluation IDs before generation.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
