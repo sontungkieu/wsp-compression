@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from repetition_followup_aggregate import reject_rate, risk_match
 from repetition_followup_astra import context
+from repetition_followup_audit import information_factorial
 from repetition_followup_baseline import consensus, scheme
 from repetition_followup_evidence import evaluate_evidence, new_row
 from repetition_followup_information import check_question_only
@@ -60,6 +61,14 @@ class FollowupTest(unittest.TestCase):
         self.assertTrue(evaluate_evidence(row,"</think>\\boxed{40}",True)["wrong_eos"])
         self.assertTrue(evaluate_evidence(row,"</think>UNKNOWN",True)["unknown"])
         self.assertFalse(evaluate_evidence(row,"\\boxed{41}",True)["correct_eos"])
+
+    def test_factorial_interaction_is_paired_by_prompt_and_operation(self):
+        p="checkpoint-cross:register:000"
+        result=information_factorial([{"pairs":{
+            "native":{p:[True,True]},"conv_only":{p:[True,False]},
+            "matrix_only":{p:[True,True]},"both":{p:[False,False]}}}])
+        self.assertEqual(result["register"]["trials"],2)
+        self.assertEqual(result["pooled"]["paired_id_interaction"]["delta_pp"],-50.)
 
     def test_thinning_keeps_cost_and_matches_dev_coverage_and_risk_when_feasible(self):
         correct={"answered":True,"correct_eos":True,"wrong_eos":False,"cost":37}

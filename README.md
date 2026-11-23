@@ -476,6 +476,8 @@ replacements and compares native and fixed-marker math with a separate
 copy and formatting check. `repetition_followup_plan.py` admits the
 external transfer matrix, and `repetition_followup_aggregate.py` combines
 verified scores and reports paired effects and direct-answer risk and coverage.
+`repetition_followup_audit.py` estimates the paired convolution-by-matrix
+interaction and compares timing policies on prompts eligible at both anchors.
 
 ## Interpretation
 
