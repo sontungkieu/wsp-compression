@@ -7,6 +7,7 @@ import statistics
 import subprocess
 import sys
 import time
+from types import SimpleNamespace
 
 from repetition_baseline import sha
 from repetition_budget_run import tokens
@@ -21,6 +22,7 @@ from repetition_sampler_reach import pack_at
 from repetition_state_value import Runtime, THINK_END, inputs_for, post_seed
 
 NATIVE, CONV, MATRIX, BOTH, DROP = ("native", "conv_only", "matrix_only", "both", "question_only")
+ZERO_CONV = "zero_conv"
 ARMS = (NATIVE, CONV, MATRIX, BOTH, DROP)
 SWAP = {CONV:(FIELDS[0],), MATRIX:(FIELDS[1],), BOTH:FIELDS}
 SWITCH, CAP, BATCH = 512, 1535, 8
@@ -68,18 +70,26 @@ def freeze(parent, excluded, output):
     })
 
 
-def sample(runtime, group, draw, cap, canary, *, swap_arms=tuple(SWAP), question_only=True):
+def sample(runtime, group, draw, cap, canary, *, swap_arms=tuple(SWAP), question_only=True, zero_conv=False):
     torch = runtime.torch
     group = [x | {"presence_seed_ids":[]} for x in group]
     question,donor = prefill_donor(runtime,group)
     packed = runtime.pack([x["native_ids"] for x in group])
     width = packed["input_ids"].shape[1]
     before = state_digest(donor,FIELDS,torch)
+    schema = {field: [str(x.dtype) for x in getattr(donor,field) if x is not None]
+              for field in (*FIELDS,"key_cache","value_cache")} if canary else None
     traces,audits = {},{}
-    arms = (NATIVE,*swap_arms,"self_copy") if canary else (NATIVE,*swap_arms)
+    fields = SWAP | {ZERO_CONV: (FIELDS[0],)}
+    interventions = (*swap_arms, ZERO_CONV) if zero_conv else swap_arms
+    zero_donor = SimpleNamespace(conv_states=[
+        torch.zeros_like(state) if state is not None else None for state in donor.conv_states
+    ]) if zero_conv else None
+    arms = (NATIVE,*interventions,"self_copy") if canary else (NATIVE,*interventions)
     for arm in arms:
         mode = "native" if arm==NATIVE else "self" if arm=="self_copy" else "swap"
-        with marker_hook(runtime,width,mode,donor,digest_kv=True,fields=SWAP.get(arm,FIELDS)) as evidence:
+        source = zero_donor if arm==ZERO_CONV else donor
+        with marker_hook(runtime,width,mode,source,digest_kv=True,fields=fields.get(arm,FIELDS)) as evidence:
             traces[arm] = runtime.generate(group,"e0",draw,cap,packed=packed)
         audits[arm] = evidence
     if len({a["kv_sha256"] for a in audits.values()})!=1 or len({a["mask_sha256"] for a in audits.values()})!=1:
@@ -91,13 +101,15 @@ def sample(runtime, group, draw, cap, canary, *, swap_arms=tuple(SWAP), question
             tokens(a)!=tokens(b) for a,b in zip(traces[NATIVE],traces["self_copy"],strict=True)
         ):
             raise ValueError("factorial self-copy differs from the native trace")
-    for arm in swap_arms:
+    for arm in interventions:
         actual = audits[arm]["layers_changed"]
-        if tuple(actual)!=SWAP[arm] or min(actual.values())<=0:
+        if tuple(actual)!=fields[arm] or min(actual.values())<=0:
             raise ValueError(f"factorial swap did not execute as declared: {arm}")
         audits[arm]["max_logit_change"] = (audits[arm]["logits"]-audits[NATIVE]["logits"]).abs().amax(dim=-1).tolist()
     for data in audits.values():
         data.pop("logits")
+    if schema is not None:
+        audits[NATIVE]["donor_cache_dtypes"] = schema
     if question_only:
         traces[DROP] = runtime.generate(question,"e0",draw,cap,
                                         packed=pack_at(runtime,[x["native_ids"] for x in question],width))

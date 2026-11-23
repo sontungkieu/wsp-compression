@@ -451,6 +451,28 @@ preserves the dataset revision and split, excludes exact normalized
 problem matches from supplied source files and archived cohort manifests,
 and freezes disjoint development and evaluation IDs before generation.
 
+`repetition_followup_queue.py` runs independent, checksum-pinned GPU and CPU
+jobs from append-only manifests. The configuration pins the host, device
+UUIDs, runtime and the access and compute deadlines. Each completed shard
+has a receipt. The supervisor records GPU release and realized GPU hours.
+
+`repetition_followup_baseline.py` runs native thinking and direct decoding
+on the same prompts. Its agreement policy gives two draws half the total
+token budget each. `repetition_followup_timing.py` replays native prefixes
+at locked positions or at the first confirmed exact cycle, with token
+cost counted from the original question. It tests keeping the prefix,
+refreshing convolutional cache state or answering directly from the question.
+
+`repetition_followup_information.py` crosses two hidden checkpoint values
+with two operations and scores all four outputs against exact numeric
+answers. Its optional zero-convolution arm clears only the convolutional
+state at the marker and verifies that the attention KV remains unchanged.
+`repetition_followup_astra.py` verifies exact published BF16 tensor
+replacements and compares native and fixed-marker math with a separate
+copy and formatting check. `repetition_followup_plan.py` admits the
+external transfer matrix, and `repetition_followup_aggregate.py` combines
+verified scores and reports paired effects and direct-answer risk and coverage.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.
