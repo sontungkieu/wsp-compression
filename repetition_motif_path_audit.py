@@ -43,8 +43,9 @@ def inspect(root, name, status, tokenizers, manifest):
     if model not in tokenizers:
         from transformers import AutoTokenizer
         tokenizers[model] = AutoTokenizer.from_pretrained(model, local_files_only=True)
+    source_options = {"source_worker": h["source_worker"]} if "source_worker" in h else {}
     _, cases = source_cases(Path(h["source"]), h["source_sha256"], panel, h["cap"], h["limit"],
-                            h["source_draw"], h["canary"], h.get("source_worker", "baseline"))
+                            h["source_draw"], h["canary"], **source_options)
     by_id = {x["row"]["id"]: x for x in cases}
     report = []
     for row in body:
@@ -87,7 +88,12 @@ def finish(root, output, deadline):
                and "canary" not in n and r["stage"] == "completed"]
         signature = tuple(ids), terminal
         if signature != old_signature:
-            plans = [j for plan in (root / "plans").glob("plan-*-motif.json") for j in load(plan)["jobs"]]
+            plans = []
+            for name, fingerprint in status["manifest_shas"].items():
+                plan = root / "plans" / name
+                if sha(plan) != fingerprint:
+                    raise ValueError(f"Motif audit manifest digest differs for {name}")
+                plans.extend(load(plan)["jobs"])
             for n in ids:
                 if n not in cache:
                     cache[n] = inspect(root, n.removesuffix("-review"), status, tokenizers, plans)
