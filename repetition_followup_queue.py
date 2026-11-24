@@ -35,9 +35,14 @@ class Campaign:
     def inventory(self):
         cards=smi("--query-gpu=index,uuid,memory.used,utilization.gpu")
         processes=smi("--query-compute-apps=gpu_uuid,pid,used_memory")
-        if socket.gethostname()!=self.cfg["host"] or [r[1] for r in cards]!=self.cfg["devices"]:
+        roster = [row[1] for row in cards]
+        assigned = set(self.cfg["devices"])
+        selected = [row for row in cards if row[1] in assigned]
+        if (socket.gethostname() != self.cfg["host"]
+                or roster != self.cfg.get("host_devices", self.cfg["devices"])
+                or not assigned or [row[1] for row in selected] != self.cfg["devices"]):
             raise ValueError("campaign GPU or host identity changed")
-        return cards,processes
+        return selected, [row for row in processes if row[0] in assigned]
 
     def manifests_now(self):
         for file in sorted((self.root/"plans").glob("plan-*.json")):

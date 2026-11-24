@@ -455,6 +455,16 @@ and freezes disjoint development and evaluation IDs before generation.
 jobs from append-only manifests. The configuration pins the host, device
 UUIDs, runtime and the access and compute deadlines. Each completed shard
 has a receipt. The supervisor records GPU release and realized GPU hours.
+For a subset allocation, record the complete ordered host roster in
+`host_devices` and the assigned UUIDs in `devices`. Scheduling and release
+receipts use the assigned UUIDs.
+
+`repetition_campaign_resume.py` restores the interrupted Nemo campaign in a
+fresh run directory. It checks the archived manifests and completed dependency
+receipts before reusing them. `repetition_campaign_handoff.py` seals the resumed
+queue, starts its reporter and stages a separate Huy successor that waits for
+the predecessor's release receipt and an idle device roster. These two
+scripts contain the campaign-specific host identity, archive pins and cutoff.
 
 `repetition_followup_baseline.py` runs native thinking and direct decoding
 on the same prompts. Its agreement policy gives two draws half the total
