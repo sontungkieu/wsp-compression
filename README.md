@@ -478,6 +478,11 @@ external transfer matrix, and `repetition_followup_aggregate.py` combines
 verified scores and reports paired effects and direct-answer risk and coverage.
 `repetition_followup_audit.py` estimates the paired convolution-by-matrix
 interaction and compares timing policies on prompts eligible at both anchors.
+`repetition_motif_intervention.py` compares native continuation, one
+off-cycle token inside thinking, forced closure and direct decoding with
+the same continuation budget. Its `run` action verifies the archived
+baseline and writes raw trajectories. `score` checks their provenance and
+reports task outcomes, motif relapse and token cost.
 
 ## Interpretation
 
