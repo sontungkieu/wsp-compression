@@ -494,6 +494,12 @@ the same continuation budget. Its `run` action verifies the archived
 baseline and writes raw trajectories. `score` checks their provenance and
 reports task outcomes, motif relapse and token cost.
 
+`repetition_motif_guard.py` replays the same one-token intervention with
+and without blocking completions of any rotation of the original motif for
+two periods. The guard redistributes ordinary token mass and preserves the
+local probabilities of phase closure and stopping. Its `score` action
+checks branch parity and records both motif return and downstream outcomes.
+
 ## Interpretation
 
 ARC-Easy uses an explicit zero-shot answer-continuation likelihood protocol.

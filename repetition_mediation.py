@@ -118,6 +118,7 @@ def processor_factory(torch, transformers, groups, sampling=SAMPLING):
             self.force_first = force_first
             self.first_step = None
             self.first_transform = None
+            self.step_transform = None
 
         def seen_mask(self, history, scores):
             seen = torch.zeros_like(scores[:self.n], dtype=torch.bool)
@@ -140,6 +141,8 @@ def processor_factory(torch, transformers, groups, sampling=SAMPLING):
                 base = result = presence_scores(scores, seen, sampling)
             sampled = top_p(ids[:self.n], top_k(ids[:self.n], result))
             probabilities = sampled.softmax(dim=-1)
+            if self.step_transform is not None:
+                probabilities = self.step_transform(history, probabilities, base)
             if self.first_step is None:
                 if self.first_transform is not None:
                     probabilities = self.first_transform(probabilities, base)
