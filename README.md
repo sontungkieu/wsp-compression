@@ -486,6 +486,8 @@ record. `repetition_motif_plan.py` pins archived sources for one-step motif
 interventions. `repetition_depth_control.py` schedules a successor only after the
 original run releases every assigned device. `repetition_depth_aggregate.py`
 combines the resulting score receipts, including the paired depth cuts.
+`repetition_motif_path_audit.py` checks the first confirmed return to the
+original motif and natural phase closure at period-scaled token budgets.
 `repetition_motif_intervention.py` compares native continuation, one
 off-cycle token inside thinking, forced closure and direct decoding with
 the same continuation budget. Its `run` action verifies the archived
