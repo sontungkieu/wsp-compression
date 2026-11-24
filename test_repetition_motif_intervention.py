@@ -1,7 +1,9 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from repetition_motif_intervention import BREAK, CLOSE, RESTART, outcome, source_cases
+from repetition_depth_aggregate import guard_summary
+from repetition_motif_intervention import BREAK, CLOSE, EXTENDED_BASELINE_SHA256, RESTART, baseline_reader, outcome, source_cases
 
 
 class ToyTokenizer:
@@ -12,6 +14,18 @@ class ToyTokenizer:
 
 
 class MotifInterventionTest(unittest.TestCase):
+    def test_extended_reader_requires_the_explicit_pinned_worker(self):
+        reader = object()
+        module = SimpleNamespace(__file__="/fixture/extended.py", verified=reader)
+        with patch.dict("sys.modules", {"repetition_followup_baseline_extended": module}):
+            with patch("repetition_motif_intervention.sha", return_value="wrong"):
+                with self.assertRaisesRegex(ValueError, "checksum differs"):
+                    baseline_reader("baseline_extended")
+            with patch("repetition_motif_intervention.sha", return_value=EXTENDED_BASELINE_SHA256):
+                self.assertIs(baseline_reader("baseline_extended"), reader)
+        with self.assertRaisesRegex(ValueError, "unregistered"):
+            baseline_reader("auto")
+
     def test_frozen_prefix_uses_only_first_confirmation(self):
         header = {"scheme": [["native", 0, 16384]], "marker": 100}
         rows = {p: {"id": p, "gold": "4"} for p in ("repeat", "closed", "too_late")}
@@ -39,6 +53,22 @@ class MotifInterventionTest(unittest.TestCase):
         self.assertTrue(outcome(case, broken, ToyTokenizer(), header, 129)["original_motif_tail"])
         restart = {"arm": RESTART, "tokens": [9], "eos_token": 101}
         self.assertTrue(outcome(case, restart, ToyTokenizer(), header, 2)["correct_eos"])
+
+    def test_guard_aggregate_counts_natural_close_and_nonzero_actions(self):
+        row = {"correct_eos": False, "wrong_eos": False, "cap": True,
+               "correct_without_eos": False, "natural_close_token": None, "first_return_confirmed": 6}
+        h = {"dataset": "math500", "split": "eval", "cap": 2048, "source_draw": 0,
+             "draw_start": 60, "eligible": 1}
+        cells = {BREAK: {"p": [row]}, "motif_guard": {"p": [
+            row | {"correct_eos": True, "cap": False, "natural_close_token": 9, "first_return_confirmed": None}]},
+                 CLOSE: {"p": [row | {"first_return_confirmed": None}]}}
+        scores = [{"header": h, "windows": {"2048": {"cells": cells}},
+                   "interventions": [{"steps": [{"opened_prefilter_support": True}]}]}]
+        result = next(iter(guard_summary(scores).values()))
+        self.assertEqual(result["nonzero_actions"], 1)
+        self.assertEqual(result["prefilter_fallback"], 1)
+        self.assertEqual(result["windows"]["2048"]["arms"]["motif_guard"]["natural_close"], 1)
+        self.assertEqual(result["windows"]["2048"]["guard_minus_break"]["delta_pp"], 100)
 
 
 if __name__ == "__main__":

@@ -488,6 +488,9 @@ original run releases every assigned device. `repetition_depth_aggregate.py`
 combines the resulting score receipts, including the paired depth cuts.
 `repetition_motif_path_audit.py` checks the first confirmed return to the
 original motif and natural phase closure at period-scaled token budgets.
+For input produced by the extended baseline worker, the motif replay
+requires `--source-worker baseline_extended` and verifies that worker's
+checksum before applying its existing raw receipt checks.
 `repetition_motif_intervention.py` compares native continuation, one
 off-cycle token inside thinking, forced closure and direct decoding with
 the same continuation budget. Its `run` action verifies the archived

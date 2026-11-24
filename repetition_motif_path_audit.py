@@ -44,7 +44,7 @@ def inspect(root, name, status, tokenizers, manifest):
         from transformers import AutoTokenizer
         tokenizers[model] = AutoTokenizer.from_pretrained(model, local_files_only=True)
     _, cases = source_cases(Path(h["source"]), h["source_sha256"], panel, h["cap"], h["limit"],
-                            h["source_draw"], h["canary"])
+                            h["source_draw"], h["canary"], h.get("source_worker", "baseline"))
     by_id = {x["row"]["id"]: x for x in cases}
     report = []
     for row in body:

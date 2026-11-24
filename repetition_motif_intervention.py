@@ -24,10 +24,22 @@ BREAK = "motif_break"
 CLOSE = "close"
 RESTART = "no_think"
 ARMS = (NATIVE, BREAK, CLOSE, RESTART)
+EXTENDED_BASELINE_SHA256 = "5757db8ab6eb1fa44962b29297315469455b91f13b6bb289378bd2d181b456f3"
 
 
-def source_cases(raw_path, fingerprint, panel, cap, limit, source_draw=0, canary=False):
-    header, rows, raw, _ = verified(raw_path, fingerprint, panel)
+def baseline_reader(source_worker):
+    if source_worker == "baseline":
+        return verified
+    if source_worker != "baseline_extended":
+        raise ValueError("unregistered baseline source worker")
+    import repetition_followup_baseline_extended as extended
+    if sha(Path(extended.__file__)) != EXTENDED_BASELINE_SHA256:
+        raise ValueError("archived extended-baseline worker checksum differs")
+    return extended.verified
+
+
+def source_cases(raw_path, fingerprint, panel, cap, limit, source_draw=0, canary=False, source_worker="baseline"):
+    header, rows, raw, _ = baseline_reader(source_worker)(raw_path, fingerprint, panel)
     native_cap = next((n for arm, d, n in header["scheme"] if arm == NATIVE and d == source_draw), None)
     if native_cap is None or (not canary and native_cap != 16384):
         raise ValueError("use a verified 16K native baseline draw for evaluation")
@@ -82,7 +94,7 @@ def close_transform(runtime, marker):
 
 def run(args):
     header, cases = source_cases(args.raw, args.fingerprint, args.panel, args.cap, args.limit,
-                                 args.source_draw, args.canary)
+                                 args.source_draw, args.canary, args.source_worker)
     if not cases and args.canary:
         raise ValueError("canary needs at least one confirmed motif")
     runtime = runtime_for(args)
@@ -102,7 +114,8 @@ def run(args):
 
         emit({"kind": "manifest", "worker_sha256_motif": sha(Path(__file__)), "source": str(args.raw),
               "source_sha256": args.fingerprint, "panel_sha256": sha(args.panel),
-              "source_draw": args.source_draw, "draws": args.draws, "draw_start": args.draw_start,
+              "source_draw": args.source_draw, "source_worker": args.source_worker,
+              "draws": args.draws, "draw_start": args.draw_start,
               "cap": args.cap, "limit": args.limit, "canary": args.canary,
               "dataset": header["dataset"], "split": header["split"],
               "eligible": len(groups), "panel_size": header["count"], "arms": ARMS,
@@ -166,7 +179,7 @@ def report(path, fingerprint, panel, model):
             or tuple(h["arms"]) != ARMS or end["kind"] != "complete"):
         raise ValueError("motif replay provenance changed")
     _, selected = source_cases(Path(h["source"]), h["source_sha256"], panel, h["cap"], h["limit"],
-                               h["source_draw"], h["canary"])
+                               h["source_draw"], h["canary"], h.get("source_worker", "baseline"))
     cases = {x["row"]["id"]: x for x in selected}
     tok = AutoTokenizer.from_pretrained(model, local_files_only=True)
     excluded = set(tok.all_special_ids) | set(h["eos_ids"]) | {h["marker"], h["turn"], h["pad_id"]}
@@ -219,6 +232,7 @@ def main():
     for name in ("panel", "raw", "model", "data", "checkpoint", "output"):
         p.add_argument("--" + name, type=Path, required=name not in ("data", "checkpoint"))
     p.add_argument("--fingerprint", required=True)
+    p.add_argument("--source-worker", choices=("baseline", "baseline_extended"), default="baseline")
     for name, default in (("draws", 2), ("draw-start", 0), ("source-draw", 0), ("batch", 4),
                           ("cap", 2048), ("limit", None), ("deadline", None)):
         p.add_argument("--" + name, type=int, default=default)

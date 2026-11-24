@@ -11,7 +11,7 @@ from repetition_mediation_queue import load, save
 
 
 def borrowed_reports(root, status):
-    motif, depth = [], []
+    motif, depth, guard = [], [], []
     for name, mark in status["jobs"].items():
         if mark["stage"] != "completed" or "canary" in name:
             continue
@@ -21,6 +21,9 @@ def borrowed_reports(root, status):
         elif name.startswith("ND-") and name.endswith("-depthreview"):
             parent = name.removesuffix("-depthreview")
             group = depth
+        elif name.startswith("GUARD-") and name.endswith("-review"):
+            parent = name.removesuffix("-review")
+            group = guard
         else:
             continue
         path = root / "jobs" / (name + ".json")
@@ -30,7 +33,7 @@ def borrowed_reports(root, status):
         if record["raw_sha256"] != status["jobs"][parent]["sha256"]:
             raise ValueError(f"secondary scorer receipt does not match {parent}")
         group.append(record)
-    return motif, depth
+    return motif, depth, guard
 
 
 def motif_summary(shards):
@@ -97,6 +100,44 @@ def information_summary(scores):
     return result
 
 
+def guard_summary(shards):
+    groups = defaultdict(list)
+    for shard in shards:
+        h = shard["header"]
+        groups[(h["dataset"], h["split"], h["cap"], h["source_draw"], h["draw_start"])].append(shard)
+    result = {}
+    for (dataset, split, cap, source_draw, draw_start), pieces in sorted(groups.items()):
+        windows = {}
+        for budget in pieces[0]["windows"]:
+            arms = defaultdict(dict)
+            for shard in pieces:
+                for arm, cells in shard["windows"][budget]["cells"].items():
+                    if arms[arm].keys() & cells.keys():
+                        raise ValueError("duplicate guard prompts within a registered panel")
+                    arms[arm].update(cells)
+            counts = {}
+            for arm, cells in arms.items():
+                rows = [row for traces in cells.values() for row in traces]
+                counts[arm] = tally(rows) | {
+                    "correct_without_eos": sum(x["correct_without_eos"] for x in rows),
+                    "natural_close": sum(x["natural_close_token"] is not None for x in rows),
+                    "original_return_confirmed": sum(x["first_return_confirmed"] is not None for x in rows),
+                }
+            windows[budget] = {"arms": counts,
+                               "guard_minus_break": contrast(arms["motif_guard"], arms["motif_break"]),
+                               "guard_minus_close": contrast(arms["motif_guard"], arms["close"])}
+        engaged = [r for shard in pieces for r in shard["interventions"] if r["steps"]]
+        steps = [step for r in engaged for step in r["steps"]]
+        result[f"{dataset}/{split}/{cap}/source-draw-{source_draw}/draw-start-{draw_start}"] = {
+            "eligible": sum(x["header"]["eligible"] for x in pieces),
+            "engaged_traces": len(engaged),
+            "nonzero_actions": len(steps),
+            "prefilter_fallback": sum(x["opened_prefilter_support"] for x in steps),
+            "windows": windows,
+        }
+    return result
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--root", type=Path, required=True)
@@ -110,9 +151,9 @@ def main():
         signature = (tuple((k, v["stage"]) for k, v in status["jobs"].items()), terminal)
         if signature != previous:
             result = summarize(a.root, status)
-            motif, depth = borrowed_reports(a.root, status)
+            motif, depth, guard = borrowed_reports(a.root, status)
             scores = [x for n, x in submitted_scores(a.root, status).items() if "canary" not in n]
-            result.update(motif=motif_summary(motif), replay_nested=replay_results(depth),
+            result.update(motif=motif_summary(motif), guard=guard_summary(guard), replay_nested=replay_results(depth),
                           information_nested=information_summary(scores))
             path = a.output if terminal or not a.watch else a.output.with_suffix(".partial.json")
             save(path, result)
