@@ -123,13 +123,14 @@ def run(a):
     partial.replace(a.output)
 
 
-def report(path,fingerprint,panel,model):
+def report(path,fingerprint,panel,model,source_worker_sha=None):
     from transformers import AutoTokenizer
     if sha(path)!=fingerprint:
         raise ValueError("timing raw digest changed")
     with path.open() as f:
         h,*body,end=map(json.loads,f)
-    if (h["worker_sha256_timing"]!=sha(Path(__file__)) or h["panel_sha256"]!=sha(panel)
+    worker_sha=source_worker_sha or sha(Path(__file__))
+    if (h["worker_sha256_timing"]!=worker_sha or h["panel_sha256"]!=sha(panel)
             or end["kind"]!="complete"):
         raise ValueError("timing worker or panel proof changed")
     _,rows,base,_=verified(Path(h["source"]),h["baseline_sha256"],panel)
@@ -156,7 +157,7 @@ def report(path,fingerprint,panel,model):
         raw[p,d,a]=r
     if raw.keys()!={(p,d,a) for p in cases for d in range(h["draws"]) for a in recorded}:
         raise ValueError("timing raw matrix incomplete")
-    windows=sorted({512,1024,INCREMENT,budget})
+    windows=sorted({n for n in (512,1024,INCREMENT,4096,budget) if n<=budget})
     cells,counts={},{str(c):{} for c in windows}
     for p,case in cases.items():
         learned={k:features[p][k] for k in FEATURES}
@@ -198,6 +199,7 @@ def main():
     for name in ("panel","model","checkpoint","data","raw","output"):
         p.add_argument("--"+name,type=Path)
     p.add_argument("--fingerprint")
+    p.add_argument("--source-worker-sha256")
     p.add_argument("--anchor",choices=ANCHORS)
     for name,default in (("draws",2),("batch",4),("deadline",None),("cap",INCREMENT)):
         p.add_argument("--"+name,type=int,default=default)
@@ -209,7 +211,7 @@ def main():
     else:
         if a.output.exists():
             raise FileExistsError(a.output)
-        save(a.output,report(a.raw,a.fingerprint,a.panel,a.model))
+        save(a.output,report(a.raw,a.fingerprint,a.panel,a.model,a.source_worker_sha256))
 
 
 if __name__=="__main__":

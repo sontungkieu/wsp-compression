@@ -478,6 +478,14 @@ external transfer matrix, and `repetition_followup_aggregate.py` combines
 verified scores and reports paired effects and direct-answer risk and coverage.
 `repetition_followup_audit.py` estimates the paired convolution-by-matrix
 interaction and compares timing policies on prompts eligible at both anchors.
+
+`repetition_information_depth.py` scores nested continuations on the original
+hidden-checkpoint panel and reports numeric answers before EOS separately. It
+compares the original evidence text with a direct instruction to use the same
+record. `repetition_motif_plan.py` pins archived sources for one-step motif
+interventions. `repetition_depth_control.py` schedules a successor only after the
+original run releases every assigned device. `repetition_depth_aggregate.py`
+combines the resulting score receipts, including the paired depth cuts.
 `repetition_motif_intervention.py` compares native continuation, one
 off-cycle token inside thinking, forced closure and direct decoding with
 the same continuation budget. Its `run` action verifies the archived
