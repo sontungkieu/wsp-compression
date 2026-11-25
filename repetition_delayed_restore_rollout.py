@@ -99,6 +99,7 @@ def run(args):
 
 def summarize(args):
     cells = defaultdict(dict)
+    traces = defaultdict(dict)
     first = None
     for path, pin in zip(args.reports, args.fingerprints, strict=True):
         if sha(path) != pin:
@@ -116,9 +117,15 @@ def summarize(args):
             if key in cells[row["arm"]]:
                 raise ValueError("duplicate restoration completion cell")
             cells[row["arm"]][key] = row["windows"]
+            traces[row["arm"]][key] = (row["tokens"], row["eos_token"], row["seed"], row["post_seed"])
     keys = cells[KEEP].keys()
     if set(cells) != set(ARMS[first["split"]]) or any(arm.keys() != keys for arm in cells.values()):
         raise ValueError("unpaired restoration completion cells")
+    parity = {}
+    for arm, group in traces.items():
+        if any(group[k][2:] != traces[KEEP][k][2:] for k in keys):
+            raise ValueError("restoration completion changed the paired random stream")
+        parity[arm] = sum(group[k][:2] == traces[KEEP][k][:2] for k in keys)
     result = {}
     for cap in sorted({min(256, first["cap"]), first["cap"]}):
         cap = str(cap)
@@ -135,7 +142,8 @@ def summarize(args):
             "matrix_vs_conv": diff("conv_matrix", "conv"),
             "kv_vs_conv": diff("conv_kv", "conv"),
         }
-    return first | {"prompts": len({key[0] for key in keys}), "score_shas": args.fingerprints, "windows": result}
+    return first | {"prompts": len({key[0] for key in keys}), "score_shas": args.fingerprints,
+                    "exact_trace_plus_eos_matches_keep": parity, "windows": result}
 
 
 def main():
