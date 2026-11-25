@@ -7,7 +7,7 @@ import unittest
 from repetition_baseline import sha
 from repetition_delayed_query import (
     KEEP, NONE, READ_ENDINGS, RESET, SIZES, THINK_END, assess, correct_eos_contrasts,
-    freeze, freeze_match, prefixes, tally,
+    freeze, freeze_match, prefixes, tally, whitespace_read,
 )
 
 
@@ -97,6 +97,15 @@ class DelayedQueryTests(unittest.TestCase):
         self.assertEqual(changes["read"]["x",0,0], 1)
         self.assertEqual(changes["apply"]["x",0,0], -1)
         self.assertEqual(changes["read_minus_apply"]["x",0,0], 2)
+
+    def test_whitespace_matching_preserves_the_first_token_and_the_entire_read_clause(self):
+        tok = CharacterTokenizer()
+        query = tok.encode("\nRead the saved register A.\n")
+        padded = whitespace_read(tok, query, len(query) + 12)
+        self.assertEqual(len(padded), len(query) + 12)
+        self.assertEqual(padded[:1] + padded[13:], query)
+        self.assertTrue(tok.decode(padded[1:13]).isspace())
+        self.assertEqual(padded, whitespace_read(tok, query, len(query) + 12))
 
 
 if __name__ == "__main__":

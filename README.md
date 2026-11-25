@@ -506,6 +506,9 @@ read query to the same token length. The matched evaluation compares keep
 against reset-conv at the 256/512 cuts of one trace. `summarize` reports the
 paired correct-plus-EOS interaction and optionally checks it against the
 checksum-pinned original score shards.
+`freeze-match --padding whitespace` inserts ordinary whitespace tokens
+after the first read token while preserving the entire read clause. Its
+separate pilot checks read accuracy before admitting the holdout.
 The numeric parser stops at the assistant turn marker, while success still
 requires the configured EOS inside the token budget. `rescore` uses the
 original checksum-pinned rollout worker to validate archived raw traces.

@@ -28,7 +28,9 @@ ARMS = {"canary": (KEEP, RESET, NONE, FRESH, SELF), "pilot": (KEEP, NONE, FRESH)
 FIELDS = ("conv_states",)
 KV = ("key_cache", "value_cache")
 MATCHED = "query-length-matched-v1"
+PADDED = "query-length-whitespace-v1"
 MATCHED_ARMS = {"canary": (KEEP, RESET, NONE, SELF), "eval": (KEEP, RESET)}
+PADDED_ARMS = MATCHED_ARMS | {"pilot": (KEEP, RESET)}
 READ_ENDINGS = (
     "Give the exact recorded number without adding an explanation.",
     "Give only the exact recorded number without adding any explanation.",
@@ -126,32 +128,61 @@ def matching_read(tok, original, length):
     raise ValueError(f"no registered read wording matches {length} tokens")
 
 
-def freeze_match(tok, source, fingerprint, path, tokenizer_sha):
+def whitespace_read(tok, original, length):
+    read = tok.decode(original, skip_special_tokens=False)
+    first = tok.decode(original[:1], skip_special_tokens=False)
+    if (encode(tok, read) != original or not read.startswith(first) or not first.isspace()
+            or len(original) >= length):
+        raise ValueError("expected a shorter archived read query beginning with whitespace")
+    excluded = set(tok.all_special_ids) | {THINK_END}
+    choices = []
+    for text in (" ", "\n", "\t", "  ", "\n\n"):
+        ids = encode(tok, text)
+        if len(ids) == 1 and ids[0] not in excluded and ids[0] not in choices:
+            if tok.decode(ids, skip_special_tokens=False).isspace():
+                choices.append(ids[0])
+    if len(choices) < 2:
+        raise ValueError("tokenizer did not expose distinct ordinary whitespace tokens")
+    order = random.Random("wsp-delayed-query-neutral-padding-v1")
+    pad = []
+    for _ in range(length - len(original)):
+        pad.append(order.choice([token for token in choices if not pad or token != pad[-1]]))
+    padded = original[:1] + pad + original[1:]
+    if tok.decode(padded, skip_special_tokens=False) != first + tok.decode(pad, skip_special_tokens=False) + read[len(first):]:
+        raise ValueError("whitespace padding changed the executable read clause")
+    return padded
+
+
+def freeze_match(tok, source, fingerprint, path, tokenizer_sha, padding="wording"):
     if path.exists():
         raise FileExistsError(path)
     if sha(source) != fingerprint:
         raise ValueError("original delayed query panel checksum changed")
     plan = load(source)
+    protocol, splits, extend = ((MATCHED, MATCHED_ARMS, matching_read) if padding == "wording"
+                                else (PADDED, PADDED_ARMS, whitespace_read))
     if (plan["format"] != 1 or plan.get("protocol") is not None or plan["tokenizer_sha256"] != tokenizer_sha
-            or any(len(plan["panels"][split]) != SIZES[split] for split in MATCHED_ARMS)):
+            or any(len(plan["panels"][split]) != SIZES[split] for split in splits)):
         raise ValueError("expected the original complete delayed query panel and tokenizer")
     panels = {}
-    for split in MATCHED_ARMS:
+    for split in splits:
         panels[split] = []
         for case in plan["panels"][split]:
             query = case["query"]
-            matched = matching_read(tok, query["read"], len(query["apply"]))
+            matched = extend(tok, query["read"], len(query["apply"]))
             panels[split].append(case | {"query": query | {"read": matched},
                                         "original_read_sha256": packed_hash(query["read"])})
-    save(path, {"format": 1, "protocol": MATCHED, "source_panel_sha256": fingerprint,
+    save(path, {"format": 1, "protocol": protocol, "source_panel_sha256": fingerprint,
                 "panels": panels, "families": plan["families"], "tokenizer_sha256": tokenizer_sha,
-                "scope": "original records and apply query; original read clause with a matched-length extension"})
+                "scope": "original records and apply query; original read clause with matched-length " + padding})
 
 
 def protocol_arms(plan, split):
     protocol = plan.get("protocol")
     if protocol == MATCHED:
         return MATCHED_ARMS[split]
+    if protocol == PADDED:
+        return PADDED_ARMS[split]
     if protocol is not None:
         raise ValueError("unrecognized delayed query protocol")
     return ARMS[split]
@@ -254,7 +285,7 @@ def run(args):
     if len(cases) != args.count or not cases or args.output.exists():
         raise ValueError("require a complete frozen shard and a fresh output")
     arms = protocol_arms(plan, args.split)
-    if plan.get("protocol") == MATCHED and (any(len(c["query"]["read"]) != len(c["query"]["apply"]) for c in cases)
+    if plan.get("protocol") in (MATCHED, PADDED) and (any(len(c["query"]["read"]) != len(c["query"]["apply"]) for c in cases)
             or (args.split == "eval" and (args.cap != 512 or args.draws != 2))):
         raise ValueError("matched eval requires equal query length, two draws and a 512-token trace")
     r = runtime_for(args)
@@ -382,7 +413,8 @@ def interval_by_id(values):
 def original_reference(args, plan, first):
     if args.reference_reports is None and args.reference_fingerprints is None:
         return None
-    if plan.get("protocol") != MATCHED or args.split != "eval" or not args.reference_reports or not args.reference_fingerprints:
+    if (plan.get("protocol") not in (MATCHED, PADDED) or args.split != "eval"
+            or not args.reference_reports or not args.reference_fingerprints):
         raise ValueError("original references are for a complete length-matched eval only")
     loaded = read_scores(args.reference_reports, args.reference_fingerprints)
     for report in loaded:
@@ -439,7 +471,7 @@ def summarize(args):
                     by_id[key[0]].append(value - paired[KEEP][key])
                 vs_keep[mode][arm] = paired_interval(dict(by_id))
         window = {"tables": tables, "signed_ci": ci, "delta_vs_keep_pp": vs_keep}
-        if plan.get("protocol") == MATCHED:
+        if plan.get("protocol") in (MATCHED, PADDED):
             matched_rows = [r for r in rows if r["arm"] in (KEEP,RESET)]
             paired, contrasts = correct_eos_contrasts(matched_rows)
             window["correct_eos_reset_minus_keep"] = {k: interval_by_id(v) for k,v in contrasts.items()}
@@ -455,10 +487,15 @@ def summarize(args):
                     paired[k] == reference_cells[k] for k in paired if k[3] == "apply")
         result["windows"][cap] = window
     primary = result["windows"][str(first["cap"])]["tables"]
-    result["gate_passed"] = (args.split != "pilot" or all(
-        primary[m][FRESH]["delta"] >= .25 and primary[m][KEEP]["delta"] >= .125
-        and primary[m][NONE]["delta"] == 0 for m in MODES))
-    if plan.get("protocol") == MATCHED and args.split == "canary":
+    result["gate_passed"] = True
+    if args.split == "pilot":
+        if plan.get("protocol") == PADDED:
+            keep_read = primary["read"][KEEP]
+            result["gate_passed"] = keep_read.get("correct_eos", 0) >= .75 * keep_read["n"]
+        else:
+            result["gate_passed"] = all(primary[m][FRESH]["delta"] >= .25 and primary[m][KEEP]["delta"] >= .125
+                                        and primary[m][NONE]["delta"] == 0 for m in MODES)
+    if plan.get("protocol") in (MATCHED, PADDED) and args.split == "canary":
         rows = [row for report in loaded for row in report["windows"][str(first["cap"])]]
         correct_read = {r["id"] for r in rows if r["arm"] == KEEP and r["mode"] == "read" and r["correct_eos"]}
         result["gate_passed"] = correct_read == expected
@@ -472,6 +509,7 @@ def main():
         p.add_argument("--"+key, type=Path)
     p.add_argument("--split", choices=tuple(ARMS))
     p.add_argument("--fingerprint")
+    p.add_argument("--padding", choices=("wording", "whitespace"), default="wording")
     p.add_argument("--archive-worker-sha256")
     p.add_argument("--reports", type=Path, nargs="+")
     p.add_argument("--fingerprints", nargs="+")
@@ -487,7 +525,7 @@ def main():
     if args.action == "freeze":
         freeze(tok, args.panel, sha(args.model/"tokenizer.json"))
     elif args.action == "freeze-match":
-        freeze_match(tok, args.source_panel, args.fingerprint, args.panel, sha(args.model/"tokenizer.json"))
+        freeze_match(tok, args.source_panel, args.fingerprint, args.panel, sha(args.model/"tokenizer.json"), args.padding)
     elif args.action == "run":
         if args.start < 0 or args.count < 1 or args.draws < 1 or not 64 <= args.cap <= 512 or args.deadline is None:
             p.error("run requires a range, a 64–512 post-marker cap and the allocation deadline")
