@@ -589,6 +589,8 @@ after the late crossing. The worker can cross values before READ or track a
 conv reset at READ through later state restoration.
 `repetition_delayed_restore_audit.py` rechecks raw restoration receipts and
 recomputes seeded token and EOS parity with a pinned CPU scorer.
+`repetition_delayed_matrix_campaign.py` adds a separate matrix-only restoration
+control on the first 16 balanced cases from the restoration holdout.
 `repetition_delayed_value_audit.py` joins verified 0.8B readout and crossing
 shards and counts paired numeral preference changes by record template and slot.
 `repetition_delayed_length_audit.py` verifies unchanged APPLY prefixes, seeds
