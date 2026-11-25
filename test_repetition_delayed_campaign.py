@@ -5,10 +5,41 @@ from unittest.mock import patch
 from repetition_delayed_campaign import compile_jobs
 from repetition_delayed_length_campaign import DEADLINE, jobs_for
 from repetition_delayed_split_tail import tail_jobs
+from repetition_delayed_timing_campaign import DEADLINE as TIMING_DEADLINE, compile_jobs as timing_jobs
+from repetition_delayed_transport_campaign import compile_jobs as transport_jobs
 from repetition_followup_queue import Campaign
 
 
 class DelayedCampaignTest(unittest.TestCase):
+    def test_restore_probe_uses_both_technical_runs_and_all_frozen_holdout_slices(self):
+        root = Path("/transport")
+        jobs = transport_jobs(root, root / "worker.py", Path("/panel.json"), Path("/model"), Path("/data"))
+        gates = {"DQR-canary-000", "DQR-canary-001"}
+        holdout = [job for job in jobs if job["lane"] == "eval" and job["kind"] == "gpu"]
+        self.assertEqual(len(holdout), 8)
+        for index, job in enumerate(holdout):
+            self.assertEqual(set(job["deps"]), gates)
+            argv = job["argv"]
+            self.assertEqual(argv[argv.index("--start") + 1], str(8 * index))
+            self.assertEqual(argv[argv.index("--count") + 1], "8")
+            self.assertEqual(argv[argv.index("--deadline") + 1], str(TIMING_DEADLINE))
+            self.assertEqual(job["preferred"], index % 2)
+
+    def test_reset_timing_uses_both_technical_scores_and_same_frozen_slices(self):
+        root = Path("/offsets")
+        jobs = timing_jobs(root, root / "worker.py", Path("/panel.json"), Path("/model"), Path("/data"))
+        gates = {"DQT-canary-000-score", "DQT-canary-001-score"}
+        holdout = [job for job in jobs if job["lane"] == "eval" and job["kind"] == "gpu"]
+        self.assertEqual(len(holdout), 8)
+        for index, job in enumerate(holdout):
+            self.assertEqual(set(job["deps"]), gates)
+            args = job["argv"]
+            self.assertEqual(
+                {flag: args[args.index(flag) + 1] for flag in ("--start", "--count", "--draws", "--cap", "--deadline")},
+                {"--start": str(8 * index), "--count": "8", "--draws": "2",
+                 "--cap": "512", "--deadline": str(TIMING_DEADLINE)})
+            self.assertEqual(job["preferred"], index % 2)
+
     def test_split_tail_only_replays_the_missing_eight_ids(self):
         root, source = Path("/tail"), Path("/workers")
         panel = Path("/archived/panel.json")

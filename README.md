@@ -518,6 +518,11 @@ before the clause and moves the last six after it. The length audit with
 checksum-verified, completed question shards at both token caps.
 `--split-tail PATH` adds the final two four-question shards from a separate
 released run, preserving the original score and release receipts.
+`repetition_delayed_timing.py` uses the same 6+6 READ token stream and
+replaces only the convolution cache before forced token 0, 7, or 17.
+Each public donor has consumed the identical forced query prefix at the
+capture position. The scorer retains the nested 256/512 correct-plus-EOS
+endpoints and reports first-answer distribution changes at the marker.
 The numeric parser stops at the assistant turn marker, while success still
 requires the configured EOS inside the token budget. `rescore` uses the
 original checksum-pinned rollout worker to validate archived raw traces.
@@ -540,6 +545,13 @@ first two holdout shards as the technical smoke, and admits the remaining
 shards with the shorter measured reserve under the same hard cutoff.
 `repetition_delayed_split_tail.py` verifies the seven archived split shards
 and starts only cases 56–63 in a fresh run on a newly allotted window.
+`repetition_delayed_timing_campaign.py` holds the 6+6 READ prefix fixed and
+admits the reset-offset holdout after two technical checks with no accuracy
+threshold. `repetition_delayed_group_audit.py` describes archived READ
+completion by record family and queried slot.
+`repetition_delayed_timing_audit.py` checks READ token traces against the
+archived KEEP and reset-at-zero controls. The transport campaign admits its
+restoration checks after the timing campaign's verified GPU release.
 `repetition_delayed_length_audit.py` verifies unchanged APPLY prefixes, seeds
 and exact continuation tokens against checksummed shards. Its
 `--position-effects` option reports paired READ differences by cache arm.
