@@ -504,7 +504,8 @@ question-only pair parity.
 `repetition_delayed_campaign.py` pins the cached artifacts and launches the
 two canaries, the 16-ID pilot, and the gated 64-ID holdout on the assigned
 General Embedding node. Its snapshot includes live GPU ownership and release
-evidence.
+evidence. `repetition_delayed_results.py` checks completed shard receipts and
+reports cluster-paired contrasts by query and record template.
 `repetition_motif_path_audit.py` checks the first confirmed return to the
 original motif and natural phase closure at period-scaled token budgets.
 For input produced by the extended baseline worker, the motif replay
