@@ -523,6 +523,13 @@ replaces only the convolution cache before forced token 0, 7, or 17.
 Each public donor has consumed the identical forced query prefix at the
 capture position. The scorer retains the nested 256/512 correct-plus-EOS
 endpoints and reports first-answer distribution changes at the marker.
+`repetition_delayed_transport.py` restores KEEP cache components at offset
+7 or 17 after an early convolution swap. Full restoration must reproduce
+the KEEP logits exactly. Partial restorations report first-answer total
+variation with paired confidence intervals.
+`repetition_delayed_numeric.py` teacher-forces both candidate numerals after
+the same newline and reports paired correct-versus-opposite log odds and
+the total probability mass of the two numeral continuations.
 The numeric parser stops at the assistant turn marker, while success still
 requires the configured EOS inside the token budget. `rescore` uses the
 original checksum-pinned rollout worker to validate archived raw traces.
