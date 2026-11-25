@@ -10,13 +10,16 @@ from repetition_baseline import sha
 from repetition_cache_swap import replace_states
 from repetition_delayed_query import FIELDS, KEEP, NONE, THINK_END, assess, interval_by_id, prefixes, query_policy, tally
 from repetition_delayed_timing import at_offset, donor_states, frozen_panel
-from repetition_delayed_transport import ALL, ANCHORS, PULSE, RESTORE, marker_forward
+from repetition_delayed_transport import ALL, ANCHORS, MATRIX, PULSE, RESTORE, marker_forward
 from repetition_followup_baseline import runtime_for
 from repetition_mediation_queue import load, save
 from repetition_sampler_reach import pack_at
 
 
 ARMS = {"canary": (KEEP, PULSE, *RESTORE), "eval": (KEEP, PULSE, "conv", "conv_matrix", "conv_kv")}
+MATRIX_ARMS = {"canary": (KEEP, PULSE, "matrix", "conv_matrix", "all"),
+               "eval": (KEEP, PULSE, "matrix", "conv_matrix")}
+RESTORE_FIELDS = RESTORE | {"matrix": MATRIX}
 PROTOCOL = "fixed-read-cache-restore-rollout-v1"
 
 
@@ -58,7 +61,9 @@ def run_case(runtime, case, anchor, cap, draws, arms, turn):
     for draw in range(draws):
         traces = {}
         for arm in arms:
-            edits = {} if arm == KEEP else pulse if arm == PULSE else pulse | {anchor: (native[anchor], RESTORE[arm])}
+            edits = {} if arm == KEEP else pulse if arm == PULSE else pulse | {
+                anchor: (native[anchor], RESTORE_FIELDS[arm])
+            }
             audit = {}
             traces[arm] = runtime.generate(
                 group, "native", draw, len(query) + 1 + cap, packed=packed, policy=policy,
@@ -85,16 +90,18 @@ def run(args):
     if len(cases) != args.count or not cases:
         raise ValueError("incomplete restoration completion shard")
     [turn] = runtime.tokenizer.encode("<|im_end|>", add_special_tokens=False)
+    arms = (MATRIX_ARMS if args.matrix_control else ARMS)[args.split]
     rows = []
     start = time.monotonic()
     with runtime.torch.inference_mode():
         for case in cases:
             if time.time() >= args.deadline - 120:
                 raise TimeoutError("restoration completion shard nearing the deadline")
-            rows.extend(run_case(runtime, case, args.anchor, args.cap, args.draws, ARMS[args.split], turn))
+            rows.extend(run_case(runtime, case, args.anchor, args.cap, args.draws, arms, turn))
     return {"protocol": PROTOCOL, "worker_sha": sha(Path(__file__)), "panel_sha256": args.panel_sha256,
             "start": args.start, "count": args.count, "cap": args.cap, "draws": args.draws, "anchor": args.anchor,
-            "split": args.split, "seconds": time.monotonic() - start, "rows": rows, **runtime.manifest}
+            "split": args.split, "matrix_control": args.matrix_control,
+            "seconds": time.monotonic() - start, "rows": rows, **runtime.manifest}
 
 
 def summarize(args):
@@ -107,10 +114,12 @@ def summarize(args):
         report = load(path)
         identity = {k: report[k] for k in ("protocol", "split", "anchor", "cap", "draws", "panel_sha256",
                                           "worker_sha", "tokenizer_sha256", "checkpoint", "runtime", "sampling")}
+        identity["matrix_control"] = report.get("matrix_control", False)
         if report["protocol"] != PROTOCOL or (first is not None and identity != first):
             raise ValueError("mixed restoration completion shards")
         first = identity
-        if len(report["rows"]) != report["count"] * report["draws"] * 2 * len(ARMS[report["split"]]):
+        expected_arms = (MATRIX_ARMS if identity["matrix_control"] else ARMS)[report["split"]]
+        if len(report["rows"]) != report["count"] * report["draws"] * 2 * len(expected_arms):
             raise ValueError("incomplete restoration completion shard")
         for row in report["rows"]:
             key = row["id"], row["draw"], row["variant"]
@@ -119,7 +128,7 @@ def summarize(args):
             cells[row["arm"]][key] = row["windows"]
             traces[row["arm"]][key] = (row["tokens"], row["eos_token"], row["seed"], row["post_seed"])
     keys = cells[KEEP].keys()
-    if set(cells) != set(ARMS[first["split"]]) or any(arm.keys() != keys for arm in cells.values()):
+    if set(cells) != set(expected_arms) or any(arm.keys() != keys for arm in cells.values()):
         raise ValueError("unpaired restoration completion cells")
     parity = {}
     for arm, group in traces.items():
@@ -138,10 +147,13 @@ def summarize(args):
         result[cap] = {
             "counts": {arm: tally(group.values()) for arm, group in scores.items()},
             "correct_eos_vs_keep": {arm: diff(arm, KEEP) for arm in cells if arm != KEEP},
-            "restore_vs_pulse": {arm: diff(arm, PULSE) for arm in cells if arm in RESTORE},
-            "matrix_vs_conv": diff("conv_matrix", "conv"),
-            "kv_vs_conv": diff("conv_kv", "conv"),
+            "restore_vs_pulse": {arm: diff(arm, PULSE) for arm in cells if arm in RESTORE_FIELDS},
         }
+        if first["matrix_control"]:
+            result[cap]["joint_vs_matrix_alone"] = diff("conv_matrix", "matrix")
+        else:
+            result[cap]["matrix_vs_conv"] = diff("conv_matrix", "conv")
+            result[cap]["kv_vs_conv"] = diff("conv_kv", "conv")
     return first | {"prompts": len({key[0] for key in keys}), "score_shas": args.fingerprints,
                     "exact_trace_plus_eos_matches_keep": parity, "windows": result}
 
@@ -154,6 +166,7 @@ def main():
     p.add_argument("--panel-sha256")
     p.add_argument("--split", choices=tuple(ARMS))
     p.add_argument("--anchor", choices=ANCHORS, type=int, default=7)
+    p.add_argument("--matrix-control", action="store_true")
     for key, default in (("start", 0), ("count", 1), ("draws", 1), ("cap", 512), ("deadline", None)):
         p.add_argument("--" + key, type=int, default=default)
     p.add_argument("--reports", type=Path, nargs="+")
