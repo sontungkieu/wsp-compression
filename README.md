@@ -519,6 +519,9 @@ limits the length-matched follow-up to GPU indexes 1 and 3. The holdout starts
 only after both canaries recover a recorded value with the extended READ query.
 `repetition_delayed_length_audit.py` verifies unchanged APPLY prefixes, seeds
 and exact continuation tokens against the original checksummed shards.
+`repetition_delayed_length_rescore.py` rechecks both archived READ/APPLY
+matrices using the first assistant turn delimiter as the answer boundary
+while preserving the configured EOS requirement and the original token cuts.
 `repetition_motif_path_audit.py` checks the first confirmed return to the
 original motif and natural phase closure at period-scaled token budgets.
 For input produced by the extended baseline worker, the motif replay
