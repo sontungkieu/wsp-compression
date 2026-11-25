@@ -59,9 +59,10 @@ def results(root, split):
         contrasts = [(arm, KEEP) for arm in ARMS[split] if arm != KEEP]
         if "reset_conv" in ARMS[split]:
             contrasts.append(("reset_conv", FRESH))
-        tables = {}
+        tables, interactions = {}, {}
         for family, subset in sorted(groups.items()):
             modes = {}
+            reset_effects = {}
             for mode in MODES:
                 arms = {a: [r for r in subset if r["mode"] == mode and r["arm"] == a] for a in ARMS[split]}
                 signal = {a: {(r["id"], r["draw"], r["variant"]): int(r["correct_eos"]) - int(r["opposite_eos"])
@@ -72,11 +73,19 @@ def results(root, split):
                     for key, effect in signal[arm].items():
                         diff[key[0]].append(effect - signal[control][key])
                     comparisons[f"{arm}-{control}"] = paired_interval(dict(diff))
+                if "reset_conv" in signal:
+                    reset_effects[mode] = {key: value - signal[KEEP][key]
+                                           for key, value in signal["reset_conv"].items()}
                 modes[mode] = {"outcomes": {a: tally(cells) for a, cells in arms.items()},
                                "contrasts_pp": comparisons}
             tables[family] = modes
+            if reset_effects:
+                diff = defaultdict(list)
+                for key, read in reset_effects["read"].items():
+                    diff[key[0]].append(read - reset_effects["apply"][key])
+                interactions[family] = paired_interval(dict(diff))
         windows[budget] = {"prompts": len(present), "draws": len(draws), "complete": selected == present,
-                           "tables": tables}
+                           "tables": tables, "reset_read_minus_apply_pp": interactions}
     return {"split": split, "panel_sha256": panel_sha, "registered_prompts": len(selected),
             "status": status["state"], "sources": sources, "windows": windows}
 
@@ -84,7 +93,7 @@ def results(root, split):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, type=Path)
-    parser.add_argument("--split", required=True, choices=("pilot", "eval"))
+    parser.add_argument("--split", default="eval", choices=("pilot", "eval"))
     args = parser.parse_args()
     print(json.dumps(results(args.root, args.split)))
 
