@@ -4,10 +4,30 @@ from unittest.mock import patch
 
 from repetition_delayed_campaign import compile_jobs
 from repetition_delayed_length_campaign import DEADLINE, jobs_for
+from repetition_delayed_split_tail import tail_jobs
 from repetition_followup_queue import Campaign
 
 
 class DelayedCampaignTest(unittest.TestCase):
+    def test_split_tail_only_replays_the_missing_eight_ids(self):
+        root, source = Path("/tail"), Path("/workers")
+        panel = Path("/archived/panel.json")
+        templates = jobs_for(Path("/archived"), source / "repetition_delayed_query.py", panel,
+                             Path("/model"), Path("/data"), technical_only=True, split_smoke=True)
+        jobs = tail_jobs(root, source, {"jobs": templates}, 1234)
+        self.assertEqual([job["id"] for job in jobs], [
+            "DQL-eval-056", "DQL-eval-056-score", "DQL-eval-060", "DQL-eval-060-score"])
+        for index, (gpu, score) in enumerate(zip(jobs[::2], jobs[1::2], strict=True)):
+            args = gpu["argv"]
+            self.assertEqual(
+                {flag: args[args.index(flag) + 1] for flag in (
+                    "--panel", "--start", "--count", "--draws", "--cap", "--deadline")},
+                {"--panel": str(panel), "--start": str(56 + index * 4), "--count": "4",
+                 "--draws": "2", "--cap": "512", "--deadline": "1234"})
+            self.assertEqual(gpu["preferred"], index)
+            self.assertEqual(score["deps"], [gpu["id"]])
+            self.assertIn(f"{{sha:{gpu['id']}}}", score["argv"])
+
     def test_split_admission_respects_the_hard_cutoff_without_the_default_long_reserve(self):
         root = Path("/unused")
         config = {"runtime": "", "deadline": DEADLINE, "devices": ["gpu1", "gpu3"],

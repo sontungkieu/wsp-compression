@@ -538,6 +538,8 @@ compares the same holdout against the before-padding score receipts.
 `--padding split` keeps six frozen tokens on each side of READ, uses the
 first two holdout shards as the technical smoke, and admits the remaining
 shards with the shorter measured reserve under the same hard cutoff.
+`repetition_delayed_split_tail.py` verifies the seven archived split shards
+and starts only cases 56–63 in a fresh run on a newly allotted window.
 `repetition_delayed_length_audit.py` verifies unchanged APPLY prefixes, seeds
 and exact continuation tokens against checksummed shards. Its
 `--position-effects` option reports paired READ differences by cache arm.
