@@ -6,7 +6,7 @@ import unittest
 
 from repetition_baseline import sha
 from repetition_delayed_query import (
-    KEEP, NONE, READ_ENDINGS, RESET, SIZES, THINK_END, assess, correct_eos_contrasts,
+    KEEP, NONE, PAD_SPLIT, READ_ENDINGS, RESET, SIZES, THINK_END, assess, correct_eos_contrasts,
     freeze, freeze_after, freeze_match, prefixes, tally, whitespace_read,
 )
 
@@ -132,6 +132,29 @@ class DelayedQueryTests(unittest.TestCase):
                 self.assertEqual(new["query"]["read"], old["query"]["read"] + expected[1:13])
                 self.assertEqual(new["query"]["apply"], old["query"]["apply"])
                 self.assertEqual(new["retained"], old["retained"])
+
+    def test_split_placement_keeps_padding_order_and_both_queries_at_23_tokens(self):
+        tok = CharacterTokenizer()
+        with tempfile.TemporaryDirectory() as d:
+            source, before, split = (Path(d) / name for name in ("source.json", "before.json", "split.json"))
+            freeze(tok, source, "fixture")
+            original = json.loads(source.read_text())
+            for cases in original["panels"].values():
+                for case in cases:
+                    case["query"] = {"read": tok.encode("\nRead this\n"), "apply": [42] * 23}
+            source.write_text(json.dumps(original))
+            freeze_match(tok, source, sha(source), before, "fixture", padding="whitespace")
+            freeze_after(tok, source, sha(source), before, sha(before), split, "fixture", 6)
+            candidate = json.loads(split.read_text())
+            padded = json.loads(before.read_text())
+        self.assertEqual(candidate["protocol"], PAD_SPLIT)
+        for name, cases in candidate["panels"].items():
+            for old, front, moved in zip(original["panels"][name], padded["panels"][name], cases, strict=True):
+                read = old["query"]["read"]
+                pad = front["query"]["read"][1:13]
+                self.assertEqual(moved, front | {"query": {"read": read[:1] + pad[:6] + read[1:] + pad[6:],
+                                                          "apply": old["query"]["apply"]}})
+                self.assertEqual(len(moved["query"]["read"]), 23)
 
 
 if __name__ == "__main__":

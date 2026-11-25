@@ -512,6 +512,10 @@ separate pilot checks read accuracy before admitting the holdout.
 `freeze-after` verifies an existing before-padding panel and moves its exact
 padding block after the same read clause. The paired summary compares the
 effect of reset-conv across the two padding positions.
+`freeze-after --front-padding-tokens 6` keeps the first six padding tokens
+before the clause and moves the last six after it. The length audit with
+`--after-reference` compares 6+6 against both 12+0 and 0+12 using the same
+checksum-verified, completed question shards at both token caps.
 The numeric parser stops at the assistant turn marker, while success still
 requires the configured EOS inside the token budget. `rescore` uses the
 original checksum-pinned rollout worker to validate archived raw traces.

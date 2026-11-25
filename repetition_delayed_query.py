@@ -30,7 +30,9 @@ KV = ("key_cache", "value_cache")
 MATCHED = "query-length-matched-v1"
 PADDED = "query-length-whitespace-v1"
 PAD_AFTER = "query-whitespace-after-v1"
-LENGTH_PROTOCOLS = (MATCHED, PADDED, PAD_AFTER)
+PAD_SPLIT = "query-whitespace-split-v1"
+PAD_POSITION_PROTOCOLS = (PAD_AFTER, PAD_SPLIT)
+LENGTH_PROTOCOLS = (MATCHED, PADDED, *PAD_POSITION_PROTOCOLS)
 MATCHED_ARMS = {"canary": (KEEP, RESET, NONE, SELF), "eval": (KEEP, RESET)}
 PADDED_ARMS = MATCHED_ARMS | {"pilot": (KEEP, RESET)}
 READ_ENDINGS = (
@@ -179,7 +181,7 @@ def freeze_match(tok, source, fingerprint, path, tokenizer_sha, padding="wording
                 "scope": "original records and apply query; original read clause with matched-length " + padding})
 
 
-def freeze_after(tok, source, fingerprint, before, before_sha, path, tokenizer_sha):
+def freeze_after(tok, source, fingerprint, before, before_sha, path, tokenizer_sha, front_padding_tokens=0):
     if path.exists():
         raise FileExistsError(path)
     if sha(source) != fingerprint or sha(before) != before_sha:
@@ -206,19 +208,26 @@ def freeze_after(tok, source, fingerprint, before, before_sha, path, tokenizer_s
                     or source_read[:1] + source_read[1+count:] != read or set(pad) & excluded
                     or any(not tok.decode([token], skip_special_tokens=False).isspace() for token in pad)):
                 raise ValueError("the before-padding pair changes more than the whitespace placement")
-            after = read + pad
-            decoded = tok.decode(read, skip_special_tokens=False) + tok.decode(pad, skip_special_tokens=False)
-            if tok.decode(after, skip_special_tokens=False) != decoded:
+            if front_padding_tokens not in (0, 6) or (front_padding_tokens == 6 and (count != 12 or len(read) != 11)):
+                raise ValueError("6+6 padding requires the archived 11-token READ and 12-token pad")
+            front_pad, back_pad = pad[:front_padding_tokens], pad[front_padding_tokens:]
+            moved = read[:1] + front_pad + read[1:] + back_pad
+            decoded = "".join(tok.decode(ids, skip_special_tokens=False)
+                              for ids in (read[:1], front_pad, read[1:], back_pad) if ids)
+            if tok.decode(moved, skip_special_tokens=False) != decoded:
                 raise ValueError("moving padding changed the decoded read clause")
-            panels[split].append(expected | {"query": query | {"read": after}})
-    save(path, {"format": 1, "protocol": PAD_AFTER, "source_panel_sha256": fingerprint,
+            panels[split].append(expected | {"query": query | {"read": moved}})
+    protocol = PAD_SPLIT if front_padding_tokens else PAD_AFTER
+    scope = ("split the archived READ whitespace at 6+6" if front_padding_tokens
+             else "move the exact before-READ whitespace block after READ")
+    save(path, {"format": 1, "protocol": protocol, "source_panel_sha256": fingerprint,
                 "before_panel_sha256": before_sha, "panels": panels, "families": original["families"],
-                "tokenizer_sha256": tokenizer_sha, "scope": "move the exact before-READ whitespace block after READ"})
+                "tokenizer_sha256": tokenizer_sha, "scope": scope})
 
 
 def protocol_arms(plan, split):
     protocol = plan.get("protocol")
-    if protocol in (MATCHED, PAD_AFTER):
+    if protocol in (MATCHED, *PAD_POSITION_PROTOCOLS):
         return MATCHED_ARMS[split]
     if protocol == PADDED:
         return PADDED_ARMS[split]
@@ -450,18 +459,18 @@ def interval_by_id(values):
 
 
 def score_reference(args, plan, first):
-    after = plan.get("protocol") == PAD_AFTER
+    pad_position = plan.get("protocol") in PAD_POSITION_PROTOCOLS
     if args.reference_reports is None and args.reference_fingerprints is None:
-        if after and args.split == "eval":
+        if pad_position and args.split == "eval":
             raise ValueError("pad-position eval requires scored before-padding references")
         return None
     if (plan.get("protocol") not in LENGTH_PROTOCOLS or args.split != "eval"
             or not args.reference_reports or not args.reference_fingerprints):
         raise ValueError("references are for a complete length-matched eval only")
     loaded = read_scores(args.reference_reports, args.reference_fingerprints)
-    expected_protocol = PADDED if after else None
-    expected_panel = plan["before_panel_sha256"] if after else plan["source_panel_sha256"]
-    expected_arms = PADDED_ARMS["eval"] if after else ARMS["eval"]
+    expected_protocol = PADDED if pad_position else None
+    expected_panel = plan["before_panel_sha256"] if pad_position else plan["source_panel_sha256"]
+    expected_arms = PADDED_ARMS["eval"] if pad_position else ARMS["eval"]
     for report in loaded:
         h = report["header"]
         if (h.get("protocol") != expected_protocol or h["panel_sha256"] != expected_panel
@@ -528,7 +537,7 @@ def summarize(args):
                 interaction = interval_by_id({k: v-reference_effects["read_minus_apply"][k]
                                               for k,v in contrasts["read_minus_apply"].items()})
                 intervals = {k: interval_by_id(v) for k,v in reference_effects.items()}
-                if plan.get("protocol") == PAD_AFTER:
+                if plan.get("protocol") in PAD_POSITION_PROTOCOLS:
                     window["before_correct_eos_reset_minus_keep"] = intervals
                     window["before_correct_eos_counts"] = {mode: {arm: sum(
                         value for key,value in reference_cells.items() if key[3:] == (mode,arm))
@@ -566,6 +575,7 @@ def main():
     p.add_argument("--split", choices=tuple(ARMS))
     p.add_argument("--fingerprint")
     p.add_argument("--before-fingerprint")
+    p.add_argument("--front-padding-tokens", type=int, choices=(0, 6), default=0)
     p.add_argument("--padding", choices=("wording", "whitespace"), default="wording")
     p.add_argument("--archive-worker-sha256")
     p.add_argument("--reports", type=Path, nargs="+")
@@ -575,6 +585,8 @@ def main():
     for k,v in (("start",0), ("count",2), ("draws",1), ("cap",512), ("deadline",None)):
         p.add_argument("--"+k, type=int, default=v)
     args = p.parse_args()
+    if args.front_padding_tokens and args.action != "freeze-after":
+        p.error("--front-padding-tokens requires freeze-after")
     if args.action in ("freeze", "freeze-match", "freeze-after", "score", "rescore"):
         from transformers import AutoTokenizer
 
@@ -585,7 +597,7 @@ def main():
         freeze_match(tok, args.source_panel, args.fingerprint, args.panel, sha(args.model/"tokenizer.json"), args.padding)
     elif args.action == "freeze-after":
         freeze_after(tok, args.source_panel, args.fingerprint, args.before_panel, args.before_fingerprint,
-                     args.panel, sha(args.model/"tokenizer.json"))
+                     args.panel, sha(args.model/"tokenizer.json"), args.front_padding_tokens)
     elif args.action == "run":
         if args.start < 0 or args.count < 1 or args.draws < 1 or not 64 <= args.cap <= 512 or args.deadline is None:
             p.error("run requires a range, a 64–512 post-marker cap and the allocation deadline")

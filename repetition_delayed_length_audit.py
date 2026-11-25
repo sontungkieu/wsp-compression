@@ -11,6 +11,8 @@ import sys
 ARMS = ("keep", "reset_conv")
 IDENTITY = ("tokenizer_sha256", "checkpoint", "runtime", "sampling")
 UNCHANGED = ("seed", "post_seed", "prefix_sha256")
+PLACEMENTS = {"12+0": "query-length-whitespace-v1", "6+6": "query-whitespace-split-v1",
+              "0+12": "query-whitespace-after-v1"}
 
 
 def sha(path):
@@ -156,6 +158,62 @@ def position_effects(root, before):
     return contrasts
 
 
+def split_position_effects(root, before, after):
+    sys.path[:0] = load(root / "config.json")["runtime"].split(":")
+    from repetition_delayed_query import correct_eos_contrasts, interval_by_id, tally
+
+    roots = {"12+0": before, "6+6": root, "0+12": after}
+    states = {placement: load(run / "status.json")["jobs"] for placement, run in roots.items()}
+    panels = {placement: sha(run / "panel.json") for placement, run in roots.items()}
+    names = [f"DQL-eval-{start:03d}" for start in range(0, 64, 8)]
+    complete = [name for name in names if states["6+6"].get(name + "-score", {}).get("stage") == "completed"]
+    if not complete:
+        raise ValueError("No complete scored split-padding shards")
+    apply_audits = {placement: audit(root, roots[placement], "DQL") for placement in ("12+0", "0+12")}
+    scores = {}
+    for placement, run in roots.items():
+        windows = defaultdict(list)
+        for name in complete:
+            state = states[placement]
+            path = run / "jobs" / f"{name}-score.json"
+            mark = state[name + "-score"]
+            if (mark["stage"] != "completed" or sha(path) != mark["sha256"]
+                    or mark != load(path.with_suffix(".receipt.json"))):
+                raise ValueError(f"Invalid score receipt for {placement} {name}")
+            score = load(path)
+            header, _ = outcomes(run, state, name)
+            if (score["header"] != header or header["protocol"] != PLACEMENTS[placement]
+                    or header["panel_sha256"] != panels[placement]
+                    or score["raw_sha256"] != state[name]["sha256"]
+                    or score["answer_boundary"] != "assistant-turn-v1" or set(score["windows"]) != {"256", "512"}):
+                raise ValueError(f"Incompatible placement score for {placement} {name}")
+            for cap, rows in score["windows"].items():
+                windows[cap].extend(rows)
+        scores[placement] = windows
+    results = {}
+    for cap in ("256", "512"):
+        keyed, effects, counts = {}, {}, {}
+        for placement, windows in scores.items():
+            rows = windows[cap]
+            keyed[placement], effects[placement] = correct_eos_contrasts(rows)
+            counts[placement] = {mode: {arm: tally([r for r in rows if r["mode"] == mode and r["arm"] == arm])
+                                        for arm in ARMS} for mode in ("read", "apply")}
+        first = keyed["12+0"]
+        if any(cells.keys() != first.keys() for cells in keyed.values()):
+            raise ValueError("One placement uses a different set of questions, draws or values")
+        read = {placement: v["read"] for placement, v in effects.items()}
+        results[cap] = {
+            "counts": counts,
+            "effects": {p: {m: interval_by_id(v) for m, v in placement.items()} for p, placement in effects.items()},
+            "read_effect_contrasts": {f"{a} minus {b}": interval_by_id({k: read[a][k] - read[b][k] for k in read[a]})
+                                      for a, b in (("6+6", "12+0"), ("6+6", "0+12"), ("0+12", "12+0"))},
+            "apply_score_parity": {p: sum(cells[k] == first[k] for k in first if k[3] == "apply")
+                                   for p, cells in keyed.items()},
+        }
+    return {"complete": len(complete) == len(names), "scored_shards": complete,
+            "panel_sha256": panels, "apply_raw_audits": apply_audits, "windows": results}
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--root", type=Path, required=True)
@@ -163,7 +221,11 @@ def main():
     p.add_argument("--archive-prefix", choices=("DQ", "DQL"), default="DQ")
     p.add_argument("--model", type=Path, help="Decode missing-numeric READ outputs after all scores finish")
     p.add_argument("--position-effects", action="store_true")
+    p.add_argument("--after-reference", type=Path, help="Compare a 6+6 run to both archived padding positions")
     args = p.parse_args()
+    if args.after_reference is not None:
+        print(json.dumps(split_position_effects(args.root, args.archive, args.after_reference)))
+        return
     result = audit(args.root, args.archive, args.archive_prefix)
     if args.model is not None:
         result["read_missing_numeric_eos"] = read_missing(args.root, args.model)
