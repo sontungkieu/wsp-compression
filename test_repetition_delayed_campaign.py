@@ -2,10 +2,27 @@ from pathlib import Path
 import unittest
 
 from repetition_delayed_campaign import compile_jobs
+from repetition_delayed_length_campaign import DEADLINE, jobs_for
 from repetition_followup_queue import Campaign
 
 
 class DelayedCampaignTest(unittest.TestCase):
+    def test_length_followup_uses_only_two_slots_and_waits_for_both_canaries(self):
+        root = Path("/unused")
+        jobs = jobs_for(root, root / "worker.py", root / "panel.json",
+                        root / "model", root / "data.parquet")
+        by_id = {job["id"]: job for job in jobs}
+        self.assertEqual(by_id["DQL-canary-gate"]["deps"],
+                         ["DQL-canary-000-score", "DQL-canary-001-score"])
+        for job in jobs:
+            self.assertIn(job["preferred"], (0, 1))
+            if job["kind"] == "gpu":
+                argv = job["argv"]
+                self.assertEqual(argv[argv.index("--deadline") + 1], str(DEADLINE))
+                if job["lane"] == "eval":
+                    self.assertEqual(job["deps"], ["DQL-canary-gate"])
+                    self.assertEqual(argv[argv.index("--draws") + 1], "2")
+
     def test_every_eval_shard_depends_on_the_complete_pilot_gate(self):
         root = Path("/unused")
         jobs = compile_jobs(root / "worker.py", root / "model", root / "panel.json",

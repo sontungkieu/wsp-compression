@@ -511,6 +511,9 @@ two canaries, the 16-ID pilot, and the gated 64-ID holdout on the assigned
 General Embedding node. Its snapshot includes live GPU ownership and release
 evidence. `repetition_delayed_results.py` checks completed shard receipts and
 reports cluster-paired contrasts by query and record template.
+`repetition_delayed_length_campaign.py` pins the original score receipts and
+limits the length-matched follow-up to GPU indexes 1 and 3. The holdout starts
+only after both canaries recover a recorded value with the extended READ query.
 `repetition_motif_path_audit.py` checks the first confirmed return to the
 original motif and natural phase closure at period-scaled token budgets.
 For input produced by the extended baseline worker, the motif replay
