@@ -25,6 +25,17 @@ class DelayedCampaignTest(unittest.TestCase):
             self.assertEqual(argv[argv.index("--deadline") + 1], str(TIMING_DEADLINE))
             self.assertEqual(job["preferred"], index % 2)
 
+    def test_numeric_probe_pins_all_three_contexts(self):
+        root = Path("/numeric")
+        panels = ["--panels", "/before", "/split", "/after", "--panel-sha256",
+                  "before_pin", "split_pin", "after_pin"]
+        jobs = transport_jobs(root, root / "numeric.py", None, Path("/model"), Path("/data"),
+                              label="DQN", panel_args=panels)
+        for job in jobs:
+            self.assertTrue(job["id"].startswith("DQN-"))
+            if job["kind"] == "gpu":
+                self.assertEqual(job["argv"][1:1 + len(panels)], panels)
+
     def test_reset_timing_uses_both_technical_scores_and_same_frozen_slices(self):
         root = Path("/offsets")
         jobs = timing_jobs(root, root / "worker.py", Path("/panel.json"), Path("/model"), Path("/data"))

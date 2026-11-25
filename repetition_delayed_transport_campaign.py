@@ -15,9 +15,11 @@ from repetition_delayed_timing_campaign import DEADLINE, PANEL, QUEUE, SELECTED
 TIMING_WORKER = "6e82ced4020abdcd9c2900ae36097a8374216dd8815747f9ef344371c88bb9ee"
 
 
-def compile_jobs(root, worker, panel, model, data):
+def compile_jobs(root, worker, panel, model, data, *, label="DQR", panel_args=None):
     jobs = []
     out = root / "jobs"
+    if panel_args is None:
+        panel_args = ["--panel", str(panel), "--panel-sha256", PANEL]
 
     def add(name, lane, kind, argv, deps, eta, preferred=0):
         jobs.append({"id": name, "lane": lane, "kind": kind, "worker": str(worker),
@@ -26,15 +28,15 @@ def compile_jobs(root, worker, panel, model, data):
                      "eta": eta, "preferred": preferred})
 
     def shard(split, start, count, needs, preferred):
-        name = f"DQR-{split}-{start:03d}"
-        add(name, split, "gpu", ["run", "--panel", str(panel), "--panel-sha256", PANEL,
+        name = f"{label}-{split}-{start:03d}"
+        add(name, split, "gpu", ["run", *panel_args,
             "--model", str(model), "--data", str(data), "--split", split, "--start", str(start),
             "--count", str(count), "--deadline", str(DEADLINE)], needs, 120 if split == "canary" else 300, preferred)
         return name
 
     canaries = [shard("canary", index, 1, [], index) for index in range(2)]
     scores = [shard("eval", start, 8, canaries, index % 2) for index, start in enumerate(range(0, 64, 8))]
-    add("DQR-eval-summary", "eval", "cpu",
+    add(f"{label}-eval-summary", "eval", "cpu",
         ["summarize", "--reports", *(str(out / f"{name}.json") for name in scores),
          "--fingerprints", *(f"{{sha:{name}}}" for name in scores)], scores, 30)
     return jobs

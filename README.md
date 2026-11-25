@@ -559,6 +559,8 @@ completion by record family and queried slot.
 `repetition_delayed_timing_audit.py` checks READ token traces against the
 archived KEEP and reset-at-zero controls. The transport campaign admits its
 restoration checks after the timing campaign's verified GPU release.
+`repetition_delayed_numeric_campaign.py` queues the bare-numeral scoring probe
+on all three archived query placements after the restoration release.
 `repetition_delayed_length_audit.py` verifies unchanged APPLY prefixes, seeds
 and exact continuation tokens against checksummed shards. Its
 `--position-effects` option reports paired READ differences by cache arm.
