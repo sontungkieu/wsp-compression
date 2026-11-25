@@ -4,6 +4,8 @@ from collections import Counter, defaultdict
 import json
 from itertools import zip_longest
 from pathlib import Path
+import random
+from statistics import fmean
 
 from repetition_delayed_length_audit import IDENTITY, UNCHANGED, load, outcomes, sha
 from repetition_replay import terminal_cycle
@@ -136,12 +138,79 @@ def audit(root, original, tail):
             "terminal_loops_at_cap": terminal_loops_at_cap}
 
 
+def timing_scores(run):
+    marks = state(run, require_release=True)
+    panel = run / "panel.json"
+    pin = sha(panel)
+    cases = load(panel)["panels"]["eval"]
+    identity = None
+    scores = defaultdict(dict)
+    for start in range(0, 64, 8):
+        header, _, report = verified_timing_shard(run, marks, f"DQT-eval-{start:03d}", pin)
+        current = {k: header[k] for k in (*IDENTITY, "worker_sha256_timing", "protocol", "draws", "cap")}
+        if identity is not None and current != identity:
+            raise ValueError("mixed fixed-query worker contracts")
+        identity = current
+        for cap, rows in report["windows"].items():
+            if report["header"]["start"] != start or {r["id"] for r in rows} != {c["id"] for c in cases[start:start+8]}:
+                raise ValueError("timing score does not cover the expected frozen range")
+            for row in rows:
+                key = row["id"], row["draw"], row["variant"], row["arm"]
+                if key in scores[cap]:
+                    raise ValueError("duplicate fixed-query score")
+                scores[cap][key] = int(row["correct_eos"])
+    return identity, cases, scores
+
+
+def compare_replication(original, replication):
+    specification, left_cases, left = timing_scores(original)
+    other, right_cases, right = timing_scores(replication)
+    if specification != other or {c["id"] for c in left_cases} & {c["id"] for c in right_cases}:
+        raise ValueError("replication needs different cases under the same worker contract")
+    def token_pairs(cases):
+        return {tuple(sorted(tuple(ids) for ids in c["retained"])) for c in cases}
+
+    if token_pairs(left_cases) & token_pairs(right_cases):
+        raise ValueError("replication repeats archived records")
+    results = {}
+    for cap in ("256", "512"):
+        results[cap] = {}
+        for a, b in (("reset_7", "keep"), ("reset_7", "reset_0"), ("reset_17", "keep")):
+            def by_question(cases, cells):
+                return [fmean(cells[c["id"], draw, variant, a] - cells[c["id"], draw, variant, b]
+                              for draw in (0, 1) for variant in (0, 1)) for c in cases]
+
+            x, y = by_question(left_cases, left[cap]), by_question(right_cases, right[cap])
+            rng = random.Random(87131)
+            pair_draws = [(fmean(rng.choices(x, k=len(x))), fmean(rng.choices(y, k=len(y)))) for _ in range(3000)]
+
+            def ci(point, values):
+                ordered = sorted(values)
+                return {"delta_pp": round(100 * point, 2),
+                        "ci95_pp": [round(100 * ordered[i], 2) for i in (75, 2924)]}
+
+            results[cap][f"{a}_minus_{b}"] = {
+                "original": ci(fmean(x), [u for u, _ in pair_draws]),
+                "replication": ci(fmean(y), [v for _, v in pair_draws]),
+                "pooled_equal_panel_weight": ci(fmean(x + y), [fmean((u, v)) for u, v in pair_draws]),
+                "replication_minus_original": ci(fmean(y) - fmean(x), [v - u for u, v in pair_draws]),
+            }
+    return {"original_prompts": len(left_cases), "replication_prompts": len(right_cases), "windows": results}
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    for name in ("root", "original", "tail"):
+    for name in ("root", "original"):
         p.add_argument("--" + name, type=Path, required=True)
+    p.add_argument("--tail", type=Path)
+    p.add_argument("--replication", action="store_true")
     a = p.parse_args()
-    print(json.dumps(audit(a.root, a.original, a.tail)))
+    if a.replication:
+        print(json.dumps(compare_replication(a.original, a.root)))
+    else:
+        if a.tail is None:
+            p.error("archived-trace audit needs --tail")
+        print(json.dumps(audit(a.root, a.original, a.tail)))
 
 
 if __name__ == "__main__":
