@@ -35,13 +35,14 @@ def outcomes(root, state, name, mode="apply"):
         raise ValueError(f"Wrong replay protocol in {name}")
     pairs = {}
     for row in entries:
-        if row["kind"] != "rollout" or row["mode"] != mode or row["arm"] not in ARMS:
+        if row["kind"] != "rollout" or (mode is not None and row["mode"] != mode) or row["arm"] not in ARMS:
             continue
-        key = tuple(row[k] for k in ("id", "draw", "variant", "arm"))
+        fields = ("id", "draw", "variant", "arm") if mode is not None else ("id", "draw", "variant", "mode", "arm")
+        key = tuple(row[k] for k in fields)
         if key in pairs:
-            raise ValueError(f"Duplicate apply trace for {name}")
+            raise ValueError(f"Duplicate trace for {name}")
         pairs[key] = row
-    if len(pairs) != head["count"] * head["draws"] * 2 * len(ARMS):
+    if len(pairs) != head["count"] * head["draws"] * 2 * len(ARMS) * (2 if mode is None else 1):
         raise ValueError(f"Incomplete {mode} traces for {name}")
     return head, pairs
 
@@ -158,38 +159,89 @@ def position_effects(root, before):
     return contrasts
 
 
-def split_position_effects(root, before, after):
+def released_jobs(root):
+    status = root / "status.json"
+    if load(root / "release.json")["status_sha256"] != sha(status):
+        raise ValueError(f"Release receipt does not match status for {root.name}")
+    return load(status)["jobs"]
+
+
+def split_position_effects(root, before, after, tail=None):
     sys.path[:0] = load(root / "config.json")["runtime"].split(":")
     from repetition_delayed_query import correct_eos_contrasts, interval_by_id, tally
 
     roots = {"12+0": before, "6+6": root, "0+12": after}
-    states = {placement: load(run / "status.json")["jobs"] for placement, run in roots.items()}
+    states = {run: released_jobs(run) for run in roots.values()}
+    if tail is not None:
+        if sha(tail / "panel.json") != sha(root / "panel.json"):
+            raise ValueError("Tail and original split panels differ")
+        states[tail] = released_jobs(tail)
     panels = {placement: sha(run / "panel.json") for placement, run in roots.items()}
-    names = [f"DQL-eval-{start:03d}" for start in range(0, 64, 8)]
-    complete = [name for name in names if states["6+6"].get(name + "-score", {}).get("stage") == "completed"]
-    if not complete:
+    case_ids = [item["id"] for item in load(root / "panel.json")["panels"]["eval"]]
+    if len(case_ids) != 64 or len(set(case_ids)) != len(case_ids):
+        raise ValueError("Expected a frozen panel of 64 distinct questions")
+    candidates = [(root, start, 8) for start in range(0, 64, 8)]
+    if tail is not None:
+        candidates += [(tail, 56, 4), (tail, 60, 4)]
+    shards = [(run, start, count) for run, start, count in candidates
+              if states[run].get(f"DQL-eval-{start:03d}-score", {}).get("stage") == "completed"]
+    selected = {case_ids[i] for _, start, count in shards for i in range(start, start + count)}
+    if not selected:
         raise ValueError("No complete scored split-padding shards")
-    apply_audits = {placement: audit(root, roots[placement], "DQL") for placement in ("12+0", "0+12")}
-    scores = {}
+    if len(selected) != sum(count for _, _, count in shards):
+        raise ValueError("Original and tail split shards overlap")
+    reference_starts = sorted({8 * (start // 8) for _, start, _ in shards})
+    scores, raw_rows, receipts = {}, {}, {}
+    identity = None
     for placement, run in roots.items():
         windows = defaultdict(list)
-        for name in complete:
-            state = states[placement]
-            path = run / "jobs" / f"{name}-score.json"
+        raw_rows[placement], receipts[placement] = {}, []
+        inputs = shards if placement == "6+6" else [(run, start, 8) for start in reference_starts]
+        for source, start, count in inputs:
+            name = f"DQL-eval-{start:03d}"
+            state = states[source]
+            path = source / "jobs" / f"{name}-score.json"
             mark = state[name + "-score"]
             if (mark["stage"] != "completed" or sha(path) != mark["sha256"]
                     or mark != load(path.with_suffix(".receipt.json"))):
                 raise ValueError(f"Invalid score receipt for {placement} {name}")
             score = load(path)
-            header, _ = outcomes(run, state, name)
+            header, raw = outcomes(source, state, name, mode=None)
             if (score["header"] != header or header["protocol"] != PLACEMENTS[placement]
                     or header["panel_sha256"] != panels[placement]
+                    or header["start"] != start or header["count"] != count
+                    or {key[0] for key in raw} != set(case_ids[start:start + count])
                     or score["raw_sha256"] != state[name]["sha256"]
                     or score["answer_boundary"] != "assistant-turn-v1" or set(score["windows"]) != {"256", "512"}):
                 raise ValueError(f"Incompatible placement score for {placement} {name}")
+            current = {key: header[key] for key in IDENTITY}
+            if identity is not None and current != identity:
+                raise ValueError("Checkpoint, tokenizer, sampler or runtime changed across shards")
+            identity = current
+            raw_rows[placement].update({key: row for key, row in raw.items() if key[0] in selected})
+            receipts[placement].append({"root": source.name, "start": start, "count": count,
+                                        "raw_sha256": state[name]["sha256"], "score_sha256": mark["sha256"]})
             for cap, rows in score["windows"].items():
-                windows[cap].extend(rows)
+                windows[cap].extend(row for row in rows if row["id"] in selected)
         scores[placement] = windows
+    complete = len(selected) == len(case_ids)
+    split_raw = raw_rows["6+6"]
+    apply_audits = {}
+    for placement in ("12+0", "0+12"):
+        reference = raw_rows[placement]
+        by_arm = {arm: Counter() for arm in ARMS}
+        if reference.keys() != split_raw.keys():
+            raise ValueError("Raw traces do not cover the same questions, draws, values and arms")
+        for key, split_row in split_raw.items():
+            old = reference[key]
+            if any(old[k] != split_row[k] for k in UNCHANGED):
+                raise ValueError("Prefix or RNG seed changed across padding positions")
+            if key[-2] == "apply":
+                tokens_match = old["tokens"] == split_row["tokens"]
+                eos_matches = old["eos_token"] == split_row["eos_token"]
+                by_arm[key[-1]].update(n=1, exact_continuation=int(tokens_match and eos_matches),
+                                      exact_token_ids=int(tokens_match), exact_eos_token=int(eos_matches))
+        apply_audits[placement] = {"complete": complete, "apply": by_arm}
     results = {}
     for cap in ("256", "512"):
         keyed, effects, counts = {}, {}, {}
@@ -210,8 +262,9 @@ def split_position_effects(root, before, after):
             "apply_score_parity": {p: sum(cells[k] == first[k] for k in first if k[3] == "apply")
                                    for p, cells in keyed.items()},
         }
-    return {"complete": len(complete) == len(names), "scored_shards": complete,
-            "panel_sha256": panels, "apply_raw_audits": apply_audits, "windows": results}
+    return {"complete": complete, "prompts": len(selected), "scored_shards": receipts["6+6"],
+            "score_receipts": receipts, "panel_sha256": panels,
+            "apply_raw_audits": apply_audits, "windows": results}
 
 
 def main():
@@ -222,9 +275,12 @@ def main():
     p.add_argument("--model", type=Path, help="Decode missing-numeric READ outputs after all scores finish")
     p.add_argument("--position-effects", action="store_true")
     p.add_argument("--after-reference", type=Path, help="Compare a 6+6 run to both archived padding positions")
+    p.add_argument("--split-tail", type=Path, help="Join the two missing split-padding shards from a supplemental run")
     args = p.parse_args()
+    if args.split_tail is not None and args.after_reference is None:
+        p.error("--split-tail requires --after-reference")
     if args.after_reference is not None:
-        print(json.dumps(split_position_effects(args.root, args.archive, args.after_reference)))
+        print(json.dumps(split_position_effects(args.root, args.archive, args.after_reference, args.split_tail)))
         return
     result = audit(args.root, args.archive, args.archive_prefix)
     if args.model is not None:

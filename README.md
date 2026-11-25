@@ -516,6 +516,8 @@ effect of reset-conv across the two padding positions.
 before the clause and moves the last six after it. The length audit with
 `--after-reference` compares 6+6 against both 12+0 and 0+12 using the same
 checksum-verified, completed question shards at both token caps.
+`--split-tail PATH` adds the final two four-question shards from a separate
+released run, preserving the original score and release receipts.
 The numeric parser stops at the assistant turn marker, while success still
 requires the configured EOS inside the token budget. `rescore` uses the
 original checksum-pinned rollout worker to validate archived raw traces.
