@@ -530,7 +530,8 @@ With `--padding after --before-panel PATH`, the queue moves the exact frozen
 pad after READ, uses technical canaries without an accuracy threshold, and
 compares the same holdout against the before-padding score receipts.
 `repetition_delayed_length_audit.py` verifies unchanged APPLY prefixes, seeds
-and exact continuation tokens against the original checksummed shards.
+and exact continuation tokens against checksummed shards. Its
+`--position-effects` option reports paired READ differences by cache arm.
 `repetition_delayed_length_rescore.py` rechecks both archived READ/APPLY
 matrices using the first assistant turn delimiter as the answer boundary
 while preserving the configured EOS requirement and the original token cuts.

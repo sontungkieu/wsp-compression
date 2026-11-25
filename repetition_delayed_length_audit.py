@@ -1,6 +1,6 @@
 """Check token-level parity of the unchanged APPLY control across delayed-query runs."""
 import argparse
-from collections import Counter
+from collections import Counter, defaultdict
 import hashlib
 import json
 from pathlib import Path
@@ -44,13 +44,13 @@ def outcomes(root, state, name, mode="apply"):
     return head, pairs
 
 
-def audit(root, archive):
+def audit(root, archive, archive_prefix="DQ"):
     new = load(root / "status.json")["jobs"]
     old = load(archive / "status.json")["jobs"]
     by_arm = {arm: Counter() for arm in ARMS}
     compared = []
     for start in range(0, 64, 8):
-        reference, candidate = f"DQ-eval-{start:03d}", f"DQL-eval-{start:03d}"
+        reference, candidate = f"{archive_prefix}-eval-{start:03d}", f"DQL-eval-{start:03d}"
         if new[candidate]["stage"] != "completed":
             continue
         h_old, old_rows = outcomes(archive, old, reference)
@@ -116,15 +116,59 @@ def read_missing(root, model):
                   "examples": list(examples[arm].values())} for arm in ARMS}
 
 
+def position_effects(root, before):
+    sys.path[:0] = load(root / "config.json")["runtime"].split(":")
+    from repetition_canonical import paired_interval
+
+    results = {}
+    for phase, run in (("before", before), ("after", root)):
+        state = load(run / "status.json")["jobs"]
+        panel_sha = sha(run / "panel.json")
+        windows = defaultdict(dict)
+        for start in range(0, 64, 8):
+            name = f"DQL-eval-{start:03d}"
+            path = run / "jobs" / f"{name}-score.json"
+            mark = state[name + "-score"]
+            if mark["stage"] != "completed" or sha(path) != mark["sha256"]:
+                raise ValueError(f"Unverified position score for {phase} {name}")
+            score = load(path)
+            if (score["header"]["panel_sha256"] != panel_sha or score["raw_sha256"] != state[name]["sha256"]
+                    or score["answer_boundary"] != "assistant-turn-v1"):
+                raise ValueError("Before/after score provenance differs")
+            for cap, entries in score["windows"].items():
+                for row in entries:
+                    if row["mode"] != "read":
+                        continue
+                    key = tuple(row[k] for k in ("id", "draw", "variant", "arm"))
+                    if key in windows[cap]:
+                        raise ValueError("Duplicate position score cell")
+                    windows[cap][key] = int(row["correct_eos"])
+        results[phase] = windows
+    contrasts = {}
+    for cap, after_rows in results["after"].items():
+        before_rows = results["before"][cap]
+        if len(after_rows) != 512 or after_rows.keys() != before_rows.keys():
+            raise ValueError("Expected identical sets of 512 before/after READ cells")
+        by_arm = {arm: defaultdict(list) for arm in ARMS}
+        for key in sorted(after_rows):
+            by_arm[key[-1]][key[0]].append(after_rows[key] - before_rows[key])
+        contrasts[cap] = {arm: paired_interval(dict(values)) for arm, values in by_arm.items()}
+    return contrasts
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--root", type=Path, required=True)
     p.add_argument("--archive", type=Path, required=True)
+    p.add_argument("--archive-prefix", choices=("DQ", "DQL"), default="DQ")
     p.add_argument("--model", type=Path, help="Decode missing-numeric READ outputs after all scores finish")
+    p.add_argument("--position-effects", action="store_true")
     args = p.parse_args()
-    result = audit(args.root, args.archive)
+    result = audit(args.root, args.archive, args.archive_prefix)
     if args.model is not None:
         result["read_missing_numeric_eos"] = read_missing(args.root, args.model)
+    if args.position_effects:
+        result["after_minus_before_read_by_arm_pp"] = position_effects(args.root, args.archive)
     print(json.dumps(result))
 
 
