@@ -496,6 +496,11 @@ record. `repetition_motif_plan.py` pins archived sources for one-step motif
 interventions. `repetition_depth_control.py` schedules a successor only after the
 original run releases every assigned device. `repetition_depth_aggregate.py`
 combines the resulting score receipts, including the paired depth cuts.
+`repetition_delayed_query.py` freezes paired synthetic records and reveals a
+read or arithmetic query only after prefix prefill. It tests donor convolution
+reset, intact cache and fresh-record controls at the same post-marker cap.
+Its pilot summary gates the held-out run on signed record use with exact
+question-only pair parity.
 `repetition_motif_path_audit.py` checks the first confirmed return to the
 original motif and natural phase closure at period-scaled token budgets.
 For input produced by the extended baseline worker, the motif replay
