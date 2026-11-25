@@ -283,13 +283,14 @@ def run(args):
     partial.replace(args.output)
 
 
-def assess(tok, case, row, cap):
+def assess(tok, case, row, cap, turn=None):
     mode, variant = row["mode"], row["variant"]
     lead = len(case["query"][mode]) + 1
     limited = row["tokens"][lead:lead+cap]
     eos = row["eos_token"] is not None and len(row["tokens"]) - lead < cap
     targets = case["targets"][mode]
-    parsed = math_answer({"gold": str(targets[variant])}, tok.decode(limited, skip_special_tokens=False),
+    visible = limited[:limited.index(turn)] if turn in limited else limited
+    parsed = math_answer({"gold": str(targets[variant])}, tok.decode(visible, skip_special_tokens=False),
                          pending_thought=False)["parsed_answer"]
     selected = targets.index(Decimal(parsed)) if parsed is not None and Decimal(parsed) in targets else None
     return {"correct_eos": eos and selected == variant, "opposite_eos": eos and selected == 1-variant,
@@ -299,13 +300,13 @@ def assess(tok, case, row, cap):
             "post_tokens": len(limited) + int(eos)}
 
 
-def score(args, tok):
+def score(args, tok, source_worker_sha=None):
     if sha(args.raw) != args.fingerprint:
         raise ValueError("delayed query raw checksum changed")
     with args.raw.open() as f:
         h, *body, end = map(json.loads, f)
     plan = load(args.panel)
-    if (h["worker_sha256_delayed"] != sha(Path(__file__)) or h["panel_sha256"] != sha(args.panel)
+    if (h["worker_sha256_delayed"] != (source_worker_sha or sha(Path(__file__))) or h["panel_sha256"] != sha(args.panel)
             or h["tokenizer_sha256"] != sha(args.model/"tokenizer.json") or end["kind"] != "complete"
             or tuple(h["arms"]) != protocol_arms(plan, h["split"]) or h.get("protocol") != plan.get("protocol")):
         raise ValueError("delayed query provenance changed")
@@ -333,10 +334,14 @@ def score(args, tok):
     expected = {(p,d,m) for p in items for d in range(h["draws"]) for m in MODES}
     if audits != expected or cells.keys() != {(*key,a,v) for key in expected for a in h["arms"] for v in (0,1)}:
         raise ValueError("incomplete delayed query matrix")
+    [turn] = encode(tok, "<|im_end|>")
+    if tok.decode([turn], skip_special_tokens=False) != "<|im_end|>":
+        raise ValueError("assistant turn token differs from the scorer policy")
     windows = {str(cap): [{"id": p, "family": items[p]["family"], "draw": d, "mode": m, "arm": a, "variant": v,
-                          **assess(tok, items[p], row, cap)} for (p,d,m,a,v),row in cells.items()]
+                          **assess(tok, items[p], row, cap, turn)} for (p,d,m,a,v),row in cells.items()]
                for cap in sorted({h["cap"], min(h["cap"],256)})}
-    return {"header": h, "raw_sha256": args.fingerprint, "seconds": end["seconds"], "windows": windows}
+    return {"header": h, "raw_sha256": args.fingerprint, "seconds": end["seconds"], "windows": windows,
+            "answer_boundary": "assistant-turn-v1", "scorer_sha256": sha(Path(__file__))}
 
 
 def tally(rows):
@@ -396,9 +401,12 @@ def summarize(args):
     first = loaded[0]["header"]
     arms = protocol_arms(plan, args.split)
     reference = original_reference(args, plan, first)
+    boundary = loaded[0].get("answer_boundary")
+    if any(r.get("answer_boundary") != boundary for r in loaded + (reference or [])):
+        raise ValueError("cannot compare scores with mixed answer boundaries")
     result = {"split": args.split, "panel_sha256": sha(args.panel), "score_shas": args.fingerprints,
               "protocol": plan.get("protocol"), "reference_score_shas": args.reference_fingerprints,
-              "windows": {}}
+              "answer_boundary": boundary, "windows": {}}
     if any(r["header"]["split"] != args.split or r["header"]["panel_sha256"] != result["panel_sha256"]
            or tuple(r["header"]["arms"]) != arms or r["header"].get("protocol") != plan.get("protocol")
            or r["header"]["draws"] != first["draws"] or r["header"]["cap"] != first["cap"] for r in loaded):
@@ -459,11 +467,12 @@ def summarize(args):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("action", choices=("freeze", "freeze-match", "run", "score", "summarize"))
-    for key in ("panel", "source-panel", "model", "checkpoint", "data", "raw", "output"):
+    p.add_argument("action", choices=("freeze", "freeze-match", "run", "score", "rescore", "summarize"))
+    for key in ("panel", "source-panel", "archive-worker", "model", "checkpoint", "data", "raw", "output"):
         p.add_argument("--"+key, type=Path)
     p.add_argument("--split", choices=tuple(ARMS))
     p.add_argument("--fingerprint")
+    p.add_argument("--archive-worker-sha256")
     p.add_argument("--reports", type=Path, nargs="+")
     p.add_argument("--fingerprints", nargs="+")
     p.add_argument("--reference-reports", type=Path, nargs="+")
@@ -471,7 +480,7 @@ def main():
     for k,v in (("start",0), ("count",2), ("draws",1), ("cap",512), ("deadline",None)):
         p.add_argument("--"+k, type=int, default=v)
     args = p.parse_args()
-    if args.action in ("freeze", "freeze-match", "score"):
+    if args.action in ("freeze", "freeze-match", "score", "rescore"):
         from transformers import AutoTokenizer
 
         tok = AutoTokenizer.from_pretrained(args.model, local_files_only=True)
@@ -486,7 +495,14 @@ def main():
     else:
         if args.output.exists():
             raise FileExistsError(args.output)
-        result = score(args, tok) if args.action == "score" else summarize(args)
+        if args.action == "rescore":
+            if args.archive_worker is None or sha(args.archive_worker) != args.archive_worker_sha256:
+                raise ValueError("archive worker bytes do not match the pinned rollout worker")
+            result = score(args, tok, args.archive_worker_sha256)
+        elif args.action == "score":
+            result = score(args, tok)
+        else:
+            result = summarize(args)
         save(args.output, result)
         if args.action == "summarize" and not result["gate_passed"]:
             raise SystemExit("record-use check did not meet the preregistered gate")

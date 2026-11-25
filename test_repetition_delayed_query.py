@@ -57,6 +57,16 @@ class DelayedQueryTests(unittest.TestCase):
         self.assertTrue(censored["correct_without_eos"])
         self.assertEqual(tally([correct, opposite, censored])["delta"], 0)
 
+    def test_bare_number_before_turn_is_visible_but_still_requires_configured_eos(self):
+        tok = CharacterTokenizer()
+        case = {"query": {"read": [11]}, "targets": {"read": [70, 72]}}
+        turn = 999
+        row = {"mode": "read", "variant": 0, "eos_token": 98,
+               "tokens": [11, THINK_END, *tok.encode("70"), turn, *tok.encode("72")]}
+        self.assertTrue(assess(tok, case, row, 6, turn)["correct_eos"])
+        self.assertTrue(assess(tok, case, row, 5, turn)["correct_without_eos"])
+        self.assertFalse(assess(tok, case, row | {"eos_token": None}, 6, turn)["correct_eos"])
+
     def test_matched_panel_changes_only_read_query_and_keeps_its_token_prefix(self):
         tok = CharacterTokenizer()
         with tempfile.TemporaryDirectory() as d:

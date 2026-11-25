@@ -506,6 +506,9 @@ read query to the same token length. The matched evaluation compares keep
 against reset-conv at the 256/512 cuts of one trace. `summarize` reports the
 paired correct-plus-EOS interaction and optionally checks it against the
 checksum-pinned original score shards.
+The numeric parser stops at the assistant turn marker, while success still
+requires the configured EOS inside the token budget. `rescore` uses the
+original checksum-pinned rollout worker to validate archived raw traces.
 `repetition_delayed_campaign.py` pins the cached artifacts and launches the
 two canaries, the 16-ID pilot, and the gated 64-ID holdout on the assigned
 General Embedding node. Its snapshot includes live GPU ownership and release
