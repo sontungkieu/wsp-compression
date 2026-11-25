@@ -536,6 +536,9 @@ pairs. All three swaps together must reconstruct the opposite row's
 conditional numeral scores.
 `repetition_delayed_replication.py` freezes new record values and IDs while
 preserving the archived 6+6 token layout and family-by-slot balance.
+`repetition_delayed_restore_rollout.py` measures correct-plus-EOS after
+selective restoration at a fixed offset on a held-out READ panel. The value
+cross can also compare a byte-pinned hybrid checkpoint on the same examples.
 The numeric parser stops at the assistant turn marker, while success still
 requires the configured EOS inside the token budget. `rescore` uses the
 original checksum-pinned rollout worker to validate archived raw traces.

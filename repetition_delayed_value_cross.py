@@ -89,6 +89,11 @@ def cross_case(runtime, case):
 
 def run(args):
     runtime = runtime_for(args)
+    if args.checkpoint is not None:
+        if runtime.manifest.get("model_type") != "qwen3_5":
+            raise ValueError("the value cross needs the pinned hybrid Qwen3.5 cache")
+        runtime.manifest["checkpoint"] = {"revision": runtime.manifest["checkpoint_revision"],
+                                          "verified_provenance_sha256": runtime.manifest["checkpoint_provenance_sha256"]}
     panel = frozen_panel(args.panel, args.panel_sha256, runtime.tokenizer, runtime.manifest["tokenizer_sha256"])
     cases = panel["panels"][args.split][args.start:args.start + args.count]
     if len(cases) != args.count or not cases:
@@ -105,9 +110,9 @@ def run(args):
             "rows": rows, **runtime.manifest}
 
 
-def summarize(args):
+def collected(reports, fingerprints):
     cases, first = {}, None
-    for path, pin in zip(args.reports, args.fingerprints, strict=True):
+    for path, pin in zip(reports, fingerprints, strict=True):
         if sha(path) != pin:
             raise ValueError("crossed-value shard checksum changed")
         report = load(path)
@@ -122,10 +127,15 @@ def summarize(args):
             if row["id"] in cases or set(row["arms"]) != set(ARMS):
                 raise ValueError("duplicate or incomplete crossed-value case")
             cases[row["id"]] = row
+    return first, cases
 
-    def values(row, arm):
-        return row["arms"][arm]["correct_minus_opposite_nats"]
 
+def values(row, arm):
+    return row["arms"][arm]["correct_minus_opposite_nats"]
+
+
+def summarize(args):
+    first, cases = collected(args.reports, args.fingerprints)
     def effect(left, right):
         return numerical_interval({pid: [x - y for x, y in zip(values(row, left), values(row, right), strict=True)]
                                    for pid, row in cases.items()})
@@ -140,7 +150,7 @@ def summarize(args):
             for pid, row in cases.items()
         })
     means = {arm: mean(mean(values(row, arm)) for row in cases.values()) for arm in ARMS}
-    return first | {
+    result = first | {
         "prompts": len(cases), "score_shas": args.fingerprints, "mean_correct_minus_opposite_nats": means,
         "mean_log_candidate_mass": {arm: mean(mean(row["arms"][arm]["log_candidate_mass"]) for row in cases.values())
                                     for arm in ARMS},
@@ -149,6 +159,24 @@ def summarize(args):
         "factorial_mean_component_effect": marginal,
         "max_full_donor_recovery_error_nats": max(r["full_donor_recovery_error_nats"] for r in cases.values()),
     }
+    if args.reference_reports is not None:
+        metadata, other = collected(args.reference_reports, args.reference_fingerprints)
+        if (metadata["panel_sha256"] != first["panel_sha256"] or metadata["split"] != first["split"]
+                or metadata["checkpoint"] == first["checkpoint"] or not cases.keys() <= other.keys()):
+            raise ValueError("transfer requires a different checkpoint on all the same evaluation IDs")
+        result["reference_checkpoint"] = metadata["checkpoint"]
+        result["reference_score_shas"] = args.reference_fingerprints
+        result["reference_mean_correct_minus_opposite_nats"] = {
+            arm: mean(mean(values(other[pid], arm)) for pid in cases) for arm in ARMS
+        }
+        result["checkpoint_difference_in_component_effect_nats"] = {
+            arm: numerical_interval({pid: [
+                (values(row, arm)[v] - values(row, KEEP)[v])
+                - (values(other[pid], arm)[v] - values(other[pid], KEEP)[v]) for v in (0, 1)
+            ] for pid, row in cases.items()})
+            for arm in COMPONENTS
+        }
+    return result
 
 
 def main():
@@ -163,9 +191,13 @@ def main():
     p.add_argument("--deadline", type=int)
     p.add_argument("--reports", type=Path, nargs="+")
     p.add_argument("--fingerprints", nargs="+")
+    p.add_argument("--reference-reports", type=Path, nargs="+")
+    p.add_argument("--reference-fingerprints", nargs="+")
     args = p.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
+    if (args.reference_reports is None) != (args.reference_fingerprints is None):
+        p.error("paired checkpoint comparison requires checksummed reference reports")
     if args.action == "run" and (args.deadline is None or args.split is None or args.start < 0 or args.count < 1):
         p.error("run requires a frozen split, valid range and deadline")
     save(args.output, run(args) if args.action == "run" else summarize(args))
