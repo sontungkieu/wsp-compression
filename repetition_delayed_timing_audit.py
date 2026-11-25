@@ -2,6 +2,7 @@
 import argparse
 from collections import Counter, defaultdict
 import json
+from itertools import zip_longest
 from pathlib import Path
 
 from repetition_delayed_length_audit import IDENTITY, UNCHANGED, load, outcomes, sha
@@ -10,6 +11,19 @@ from repetition_delayed_length_audit import IDENTITY, UNCHANGED, load, outcomes,
 ARMS = ("keep", "reset_0", "reset_7", "reset_17")
 METRICS = ("correct_eos", "correct_without_eos", "cap", "opposite_eos",
            "other_numeric_eos", "missing_numeric_eos")
+BANDS = ((1, "token1"), (4, "token2-4"), (16, "token5-16"), (64, "token17-64"), (512, "token65-512"))
+
+
+def answer_path(row, query_length):
+    visible = row["tokens"][query_length + 1:]
+    return visible if row["eos_token"] is None else visible + [row["eos_token"]]
+
+
+def first_divergence(before, after, cap):
+    for index, (left, right) in enumerate(zip_longest(before[:cap], after[:cap]), start=1):
+        if left != right:
+            return next(label for bound, label in BANDS if index <= bound)
+    return "identical"
 
 
 def state(run, require_release=False):
@@ -49,8 +63,10 @@ def audit(root, original, tail):
     pin = sha(panel_path)
     panel = load(panel_path)["panels"]["eval"]
     cases = {c["id"]: (c["family"], c["slot"]) for c in panel}
+    widths = {c["id"]: len(c["query"]["read"]) for c in panel}
     matches = {arm: Counter() for arm in ("keep", "reset_0")}
     groups = defaultdict(lambda: defaultdict(lambda: defaultdict(Counter)))
+    divergences = defaultdict(lambda: defaultdict(lambda: defaultdict(Counter)))
     shards = {}
     for start in range(0, 64, 8):
         name = f"DQT-eval-{start:03d}"
@@ -82,13 +98,29 @@ def audit(root, original, tail):
         shards[name] = {"raw_sha256": current[name]["sha256"],
                         "score_sha256": current[name + "-score"]["sha256"], "count": len(seen)}
         for cap, scores in data["windows"].items():
+            correct = {(r["id"], r["draw"], r["variant"], r["arm"]): bool(r["correct_eos"]) for r in scores}
             for row in scores:
                 family, slot = cases[row["id"]]
                 for group in ("all", family, f"slot{slot}"):
                     groups[cap][group][row["arm"]].update(
                         n=1, **{key: int(row[key]) for key in METRICS})
+                arm = row["arm"]
+                if arm == "keep":
+                    continue
+                key = row["id"], row["draw"], row["variant"]
+                width = widths[row["id"]]
+                keep_key, reset_key = (*key, "keep"), (*key, arm)
+                lag = first_divergence(answer_path(rows[keep_key], width), answer_path(rows[reset_key], width),
+                                       int(cap))
+                label = {
+                    (False, False): "both_fail", (True, True): "both_correct",
+                    (False, True): "gain", (True, False): "loss",
+                }[correct[keep_key], correct[reset_key]]
+                divergences[cap][arm]["all"][lag] += 1
+                divergences[cap][arm][label][lag] += 1
     return {"complete": len(shards) == 8, "prompts": sum(x["count"] for x in shards.values()),
-            "panel_sha256": pin, "shards": shards, "archived_read_parity": matches, "subgroups": groups}
+            "panel_sha256": pin, "shards": shards, "archived_read_parity": matches, "subgroups": groups,
+            "first_answer_divergence": divergences}
 
 
 def main():
