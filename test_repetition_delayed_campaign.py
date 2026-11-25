@@ -1,5 +1,6 @@
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from repetition_delayed_campaign import compile_jobs
 from repetition_delayed_length_campaign import DEADLINE, jobs_for
@@ -7,6 +8,25 @@ from repetition_followup_queue import Campaign
 
 
 class DelayedCampaignTest(unittest.TestCase):
+    def test_split_admission_respects_the_hard_cutoff_without_the_default_long_reserve(self):
+        root = Path("/unused")
+        config = {"runtime": "", "deadline": DEADLINE, "devices": ["gpu1", "gpu3"],
+                  "admission_floor_seconds": 45, "admission_buffer_seconds": 30}
+        queue = Campaign(root, config)
+        jobs = jobs_for(root, root / "worker.py", root / "panel.json", root / "model",
+                        root / "data.parquet", technical_only=True, split_smoke=True)
+        holdout = [job for job in jobs if job["kind"] == "gpu"]
+        self.assertEqual(len(holdout), 8)
+        self.assertTrue(all(job["lane"] == "eval" and not job["deps"] for job in holdout))
+        queue.jobs = {job["id"]: job for job in holdout}
+        queue.mark = {job["id"]: {"stage": "queued"} for job in holdout}
+        with patch("repetition_followup_queue.time.time", return_value=DEADLINE - 400):
+            queue.schedule([], [])
+        self.assertTrue(all(mark["stage"] == "queued" for mark in queue.mark.values()))
+        with patch("repetition_followup_queue.time.time", return_value=DEADLINE - 350):
+            queue.schedule([], [])
+        self.assertTrue(all(mark["stage"] == "skipped_deadline" for mark in queue.mark.values()))
+
     def test_padding_position_holdout_uses_only_the_two_technical_canaries(self):
         root = Path("/unused")
         jobs = jobs_for(root, root / "worker.py", root / "panel.json", root / "model",

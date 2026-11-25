@@ -533,6 +533,9 @@ new CPU scores derived from the original frozen raw trajectories.
 With `--padding after --before-panel PATH`, the queue moves the exact frozen
 pad after READ, uses technical canaries without an accuracy threshold, and
 compares the same holdout against the before-padding score receipts.
+`--padding split` keeps six frozen tokens on each side of READ, uses the
+first two holdout shards as the technical smoke, and admits the remaining
+shards with the shorter measured reserve under the same hard cutoff.
 `repetition_delayed_length_audit.py` verifies unchanged APPLY prefixes, seeds
 and exact continuation tokens against checksummed shards. Its
 `--position-effects` option reports paired READ differences by cache arm.

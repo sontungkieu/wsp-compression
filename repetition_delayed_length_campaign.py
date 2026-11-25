@@ -23,7 +23,7 @@ PRESERVED = ("id", "family", "slot", "public", "retained", "evidence",
              "targets", "record_changed_positions")
 
 
-def panel_proof(source_panel, new_panel, whitespace=False, before_panel=None):
+def panel_proof(source_panel, new_panel, whitespace=False, before_panel=None, front_padding=0):
     if sha(source_panel) != ARCHIVED_PANEL:
         raise ValueError("Archived panel bytes differ from the locked holdout")
     old, new = load(source_panel), load(new_panel)
@@ -55,8 +55,9 @@ def panel_proof(source_panel, new_panel, whitespace=False, before_panel=None):
                 pad = reference_read[1:-len(original_read) + 1]
                 if (reference["id"] != existing["id"] or len(pad) != 12
                         or reference_read != original_read[:1] + pad + original_read[1:]
-                        or query["read"] != original_read + pad):
-                    raise ValueError(f"After READ is not an exact move of the padding for {derived['id']}")
+                        or query["read"] != original_read[:1] + pad[:front_padding]
+                        + original_read[1:] + pad[front_padding:]):
+                    raise ValueError(f"READ is not an exact move of the padding for {derived['id']}")
             lengths[(len(old_query["read"]), len(query["read"]), len(query["apply"]))] += 1
         counts[split] = [{"old_read": a, "new_read": b, "apply": c, "ids": n}
                          for (a, b, c), n in sorted(lengths.items())]
@@ -101,7 +102,7 @@ def original_raws(archive):
 
 
 def jobs_for(root, worker, panel, model, data, references=(), archived=None, whitespace=False,
-             technical_only=False):
+             technical_only=False, split_smoke=False):
     out = root / "jobs"
     jobs = []
 
@@ -119,19 +120,19 @@ def jobs_for(root, worker, panel, model, data, references=(), archived=None, whi
         add(name, split, "gpu", worker, ["run", *common, "--data", str(data), "--split", split,
             "--start", str(start), "--count", str(count), "--draws", str(draws),
             "--cap", "128" if canary else "512", "--deadline", str(DEADLINE)],
-            deps, ".jsonl", preferred=preferred, eta=240 if canary else 700)
+            deps, ".jsonl", preferred=preferred, eta=330 if split_smoke else 240 if canary else 700)
         score = name + "-score"
         add(score, split, "cpu", worker, ["score", *common, "--raw", str(out / (name + ".jsonl")),
-            "--fingerprint", f"{{sha:{name}}}"], [name], ".json")
+            "--fingerprint", f"{{sha:{name}}}"], [name], ".json", eta=30 if split_smoke else 120)
         return score
 
     def score_args(names):
         return ["--panel", str(panel), "--reports", *(str(out / (n + ".json")) for n in names),
                 "--fingerprints", *(f"{{sha:{n}}}" for n in names)]
 
-    technical = [shard("canary", j, 1, 1, j, []) for j in range(2)]
+    technical = [] if split_smoke else [shard("canary", j, 1, 1, j, []) for j in range(2)]
     gates = technical
-    if not technical_only:
+    if not (technical_only or split_smoke):
         gate = "DQL-canary-gate"
         add(gate, "canary", "cpu", worker, ["summarize", "--split", "canary", *score_args(technical)],
             technical, ".json")
@@ -156,7 +157,7 @@ def jobs_for(root, worker, panel, model, data, references=(), archived=None, whi
                       "--reference-fingerprints", *(f"{{sha:{name}}}" for name in originals)]
     add("DQL-eval-summary", "eval", "cpu", worker,
         ["summarize", "--split", "eval", *score_args(heldout), *references],
-        heldout + originals, ".json")
+            heldout + originals, ".json", eta=20 if split_smoke else 120)
     return jobs
 
 
@@ -164,7 +165,8 @@ def launch(args):
     live = preflight()
     if not set(SELECTED) <= set(live["idle"]):
         raise ValueError("Expected GPU indexes 1 and 3 to still be idle")
-    if time.time() >= DEADLINE - 1800:
+    split = args.padding == "split"
+    if time.time() >= DEADLINE - (450 if split else 1800):
         raise TimeoutError("Insufficient allocation time to begin the gated wave")
     source, root, base = args.source, args.root, args.base
     if root.parent != base / "runs" or source.parent != base / "tmp" or (root / "launch.json").exists():
@@ -186,7 +188,8 @@ def launch(args):
     if sha(args.source_panel) != ARCHIVED_PANEL:
         raise ValueError("Archived holdout digest differs")
     whitespace = args.padding == "whitespace"
-    after = args.padding == "after"
+    after = args.padding in ("after", "split")
+    front_padding = 6 if split else 0
     if after:
         before = args.before_panel
         if before is None or sha(before) != BEFORE_PANEL:
@@ -195,17 +198,21 @@ def launch(args):
         if sha(release) != BEFORE_RELEASE or load(release)["status_sha256"] != sha(before.parent / "status.json"):
             raise ValueError("Before-padding release proof differs")
         freeze = ["freeze-after", "--before-panel", str(before), "--before-fingerprint", BEFORE_PANEL]
+        if split:
+            freeze += ["--front-padding-tokens", str(front_padding)]
     else:
         before = None
         freeze = ["freeze-match", "--padding", args.padding]
     subprocess.run([sys.executable, "-B", str(worker), *freeze, "--source-panel", str(args.source_panel),
                     "--fingerprint", ARCHIVED_PANEL, "--model", str(model), "--panel", str(panel)],
                    check=True, env=env)
-    shapes = panel_proof(args.source_panel, panel, whitespace, before)
+    shapes = panel_proof(args.source_panel, panel, whitespace, before, front_padding)
     controller = Path(__file__).resolve()
     config = {"host": HOST, "host_devices": DEVICES, "devices": [DEVICES[i] for i in SELECTED],
               "deadline": DEADLINE, "access": DEADLINE - 900, "source_root": str(source),
               "runtime": env["PYTHONPATH"], "queue_sha256": args.queue_sha256}
+    if split:
+        config.update(access=DEADLINE - 120, admission_floor_seconds=45, admission_buffer_seconds=30)
     archive = args.source_panel.parent
     if whitespace:
         prior_worker = base / "tmp" / archive.name / worker.name
@@ -215,7 +222,7 @@ def launch(args):
         jobs = jobs_for(root, worker, panel, model, data, archived=archived, whitespace=True)
     elif after:
         references = reference_args(before.parent, prefix="DQL", summary_pin=BEFORE_SUMMARY)
-        jobs = jobs_for(root, worker, panel, model, data, references, technical_only=True)
+        jobs = jobs_for(root, worker, panel, model, data, references, technical_only=True, split_smoke=split)
     else:
         jobs = jobs_for(root, worker, panel, model, data, reference_args(archive))
     (root / "plans").mkdir()
@@ -242,7 +249,7 @@ def main():
         parser.add_argument("--" + option, type=Path, required=True)
     parser.add_argument("--worker-sha256", required=True)
     parser.add_argument("--queue-sha256", required=True)
-    parser.add_argument("--padding", choices=("wording", "whitespace", "after"), required=True)
+    parser.add_argument("--padding", choices=("wording", "whitespace", "after", "split"), required=True)
     parser.add_argument("--before-panel", type=Path)
     launch(parser.parse_args())
 

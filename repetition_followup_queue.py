@@ -138,7 +138,8 @@ class Campaign:
                 continue
             if any(self.mark[d]["stage"] in TERMINAL-{"completed"} for d in job["deps"]):
                 current.update(stage="blocked",reason="required job did not complete")
-            elif time.time()+max(1200,job["eta"]+900)>=self.cfg["deadline"]:
+            elif time.time() + max(self.cfg.get("admission_floor_seconds", 1200),
+                                   job["eta"] + self.cfg.get("admission_buffer_seconds", 900)) >= self.cfg["deadline"]:
                 current.update(stage="skipped_deadline",reason="arrival would exceed the reserved end buffer")
         taken={d for _,d,_ in self.live.values() if d}
         occupied={u for u,_,_ in processes}
