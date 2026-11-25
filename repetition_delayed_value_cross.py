@@ -29,12 +29,13 @@ PROTOCOL = "delayed-read-cross-value-v1"
 
 
 @contextmanager
-def cross_receiver(runtime, width, query, arm, _donors, audit, _marker):
+def cross_receiver(runtime, width, query, arm, settings, audit, _marker):
     torch = runtime.torch
     fields = ARMS[arm]
+    offset = settings["offset"]
 
     def pre(_module, _args, kwargs):
-        hit = at_offset(kwargs, width, {0: query[0]})
+        hit = at_offset(kwargs, width, {offset: query[offset]})
         if hit is None:
             return
         if audit:
@@ -58,7 +59,7 @@ def cross_receiver(runtime, width, query, arm, _donors, audit, _marker):
         raise ValueError("missed value-cross intervention")
 
 
-def cross_case(runtime, case):
+def cross_case(runtime, case, offset):
     query = case["query"]["read"]
     width = max(len(ids) for arm in (KEEP, NONE, "fresh_record") for ids in prefixes(case, arm))
     receiver_ids = prefixes(case, KEEP)
@@ -70,7 +71,7 @@ def cross_case(runtime, case):
     for arm in ARMS:
         matrix = []
         for candidate, numeral in enumerate(numerals):
-            lp, audit = conditional_scores(runtime, packed, query, scaffold, numeral, arm, {},
+            lp, audit = conditional_scores(runtime, packed, query, scaffold, numeral, arm, {"offset": offset},
                                            scoring_hook=cross_receiver)
             if arm == KEEP:
                 reference[candidate] = audit["pre_sha"]
@@ -104,9 +105,10 @@ def run(args):
         for case in cases:
             if time.time() >= args.deadline - 120:
                 raise TimeoutError("crossed-value shard nearing allocation deadline")
-            rows.append(cross_case(runtime, case))
+            rows.append(cross_case(runtime, case, args.offset))
     return {"protocol": PROTOCOL, "worker_sha": sha(Path(__file__)), "panel_sha256": args.panel_sha256,
-            "split": args.split, "start": args.start, "count": args.count, "seconds": time.monotonic() - start,
+            "split": args.split, "offset": args.offset, "start": args.start, "count": args.count,
+            "seconds": time.monotonic() - start,
             "rows": rows, **runtime.manifest}
 
 
@@ -118,6 +120,7 @@ def collected(reports, fingerprints):
         report = load(path)
         identity = {k: report[k] for k in ("panel_sha256", "worker_sha", "split", "checkpoint", "tokenizer_sha256",
                                           "runtime", "protocol")}
+        identity["offset"] = report.get("offset", 0)
         if report["protocol"] != PROTOCOL or (first is not None and identity != first):
             raise ValueError("mixed crossed-value shards")
         first = identity
@@ -161,15 +164,19 @@ def summarize(args):
     }
     if args.reference_reports is not None:
         metadata, other = collected(args.reference_reports, args.reference_fingerprints)
-        if (metadata["panel_sha256"] != first["panel_sha256"] or metadata["split"] != first["split"]
-                or metadata["checkpoint"] == first["checkpoint"] or not cases.keys() <= other.keys()):
-            raise ValueError("transfer requires a different checkpoint on all the same evaluation IDs")
+        checkpoint_changed = metadata["checkpoint"] != first["checkpoint"]
+        offset_changed = metadata["offset"] != first["offset"]
+        if (any(metadata[k] != first[k] for k in ("panel_sha256", "split", "runtime", "tokenizer_sha256"))
+                or checkpoint_changed == offset_changed or not cases.keys() <= other.keys()):
+            raise ValueError("comparison requires changing only checkpoint or only offset on the same evaluation IDs")
         result["reference_checkpoint"] = metadata["checkpoint"]
+        result["reference_offset"] = metadata["offset"]
         result["reference_score_shas"] = args.reference_fingerprints
         result["reference_mean_correct_minus_opposite_nats"] = {
             arm: mean(mean(values(other[pid], arm)) for pid in cases) for arm in ARMS
         }
-        result["checkpoint_difference_in_component_effect_nats"] = {
+        comparison = "checkpoint" if checkpoint_changed else "offset"
+        result[f"{comparison}_difference_in_component_effect_nats"] = {
             arm: numerical_interval({pid: [
                 (values(row, arm)[v] - values(row, KEEP)[v])
                 - (values(other[pid], arm)[v] - values(other[pid], KEEP)[v]) for v in (0, 1)
@@ -186,6 +193,7 @@ def main():
         p.add_argument("--" + key, type=Path, required=key == "output")
     p.add_argument("--panel-sha256")
     p.add_argument("--split", choices=("canary", "eval"))
+    p.add_argument("--offset", type=int, choices=(0, 7, 17), default=0)
     p.add_argument("--start", type=int, default=0)
     p.add_argument("--count", type=int, default=1)
     p.add_argument("--deadline", type=int)
