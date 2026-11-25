@@ -520,6 +520,9 @@ reports cluster-paired contrasts by query and record template.
 `repetition_delayed_length_campaign.py` pins the original score receipts and
 limits the length-matched follow-up to GPU indexes 1 and 3. The holdout starts
 only after both canaries recover a recorded value with the extended READ query.
+With `--padding whitespace`, the queue also requires the frozen 16-case pilot
+to recover at least 24 of 32 READ values with EOS. Its final comparison uses
+new CPU scores derived from the original frozen raw trajectories.
 `repetition_delayed_length_audit.py` verifies unchanged APPLY prefixes, seeds
 and exact continuation tokens against the original checksummed shards.
 `repetition_delayed_length_rescore.py` rechecks both archived READ/APPLY

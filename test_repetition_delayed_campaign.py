@@ -7,6 +7,24 @@ from repetition_followup_queue import Campaign
 
 
 class DelayedCampaignTest(unittest.TestCase):
+    def test_whitespace_holdout_waits_for_pilot_and_scores_with_corrected_archive(self):
+        root = Path("/unused")
+        old = (root / "old-panel.json", root / "old-worker.py",
+               [(root / f"old-{index}.jsonl", "0" * 64) for index in range(8)])
+        jobs = jobs_for(root, root / "worker.py", root / "panel.json", root / "model",
+                        root / "data.parquet", archived=old, whitespace=True)
+        by_id = {job["id"]: job for job in jobs}
+        pilot = [job for job in jobs if job["kind"] == "gpu" and job["lane"] == "pilot"]
+        self.assertEqual(len(pilot), 4)
+        self.assertTrue(all(job["deps"] == ["DQL-canary-gate"] for job in pilot))
+        heldout = [job for job in jobs if job["kind"] == "gpu" and job["lane"] == "eval"]
+        self.assertTrue(all(job["deps"] == ["DQL-pilot-gate"] for job in heldout))
+        reference = [job for job in jobs if job["lane"] == "archive"]
+        self.assertEqual(len(reference), 8)
+        self.assertTrue(all(job["kind"] == "cpu" and job["argv"][0] == "rescore" for job in reference))
+        self.assertEqual(set(by_id["DQL-eval-summary"]["deps"]),
+                         {job["id"] for job in reference} | {job["id"] + "-score" for job in heldout})
+
     def test_length_followup_uses_only_two_slots_and_waits_for_both_canaries(self):
         root = Path("/unused")
         jobs = jobs_for(root, root / "worker.py", root / "panel.json",

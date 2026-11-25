@@ -14,19 +14,21 @@ DEADLINE = 1795631904
 SELECTED = (1, 3)
 ARCHIVED_PANEL = "317618796f245a9caacc0a444c3777eba6b241a2690e364a8dcb2b86403547fe"
 ARCHIVED_SUMMARY = "e548dc6ce259a22ac0dd4a1f0835e9e319fe54573efc051f8f4227a19329a9ad"
+ARCHIVED_WORKER = "db7ddc8598b6b78c3ac9e1653303cbada5b8285a8596e17fe4b9248b5e05417c"
 CAMPAIGN_HELPER = "d87750404144dea62a981ebf4e350ab2a7ebd1ef59a4d851b1bd444aa5ede598"
 PRESERVED = ("id", "family", "slot", "public", "retained", "evidence",
              "targets", "record_changed_positions")
 
 
-def panel_proof(source_panel, new_panel):
+def panel_proof(source_panel, new_panel, whitespace=False):
     if sha(source_panel) != ARCHIVED_PANEL:
         raise ValueError("Archived panel bytes differ from the locked holdout")
     old, new = load(source_panel), load(new_panel)
     if old["tokenizer_sha256"] != new["tokenizer_sha256"]:
         raise ValueError("Matched queries used a different tokenizer")
     counts = {}
-    for split, count in (("canary", 2), ("eval", 64)):
+    splits = {"canary": 2, "pilot": 16, "eval": 64} if whitespace else {"canary": 2, "eval": 64}
+    for split, count in splits.items():
         before, after = old["panels"][split], new["panels"][split]
         if len(before) != count or len(after) != count:
             raise ValueError(f"Unexpected cohort size for {split}")
@@ -37,6 +39,9 @@ def panel_proof(source_panel, new_panel):
                     or query["apply"] != old_query["apply"] or query["read"] == old_query["read"]
                     or len(query["read"]) != len(query["apply"])):
                 raise ValueError(f"Unexpected change besides the matched READ query for {derived['id']}")
+            if whitespace and (query["read"][0] != old_query["read"][0]
+                               or query["read"][-(len(old_query["read"]) - 1):] != old_query["read"][1:]):
+                raise ValueError(f"Whitespace experiment changed a READ clause token for {derived['id']}")
             lengths[(len(old_query["read"]), len(query["read"]), len(query["apply"]))] += 1
         counts[split] = [{"old_read": a, "new_read": b, "apply": c, "ids": n}
                          for (a, b, c), n in sorted(lengths.items())]
@@ -64,14 +69,30 @@ def reference_args(archive):
     return ["--reference-reports", *reports, "--reference-fingerprints", *hashes]
 
 
-def jobs_for(root, worker, panel, model, data, references=()):
+def original_raws(archive):
+    provenance = reference_args(archive)
+    reports = provenance[1:9]
+    status = load(archive / "status.json")["jobs"]
+    raws = []
+    for report in reports:
+        name = Path(report).stem.removesuffix("-score")
+        mark = status[name]
+        raw = archive / "jobs" / f"{name}.jsonl"
+        if (mark["stage"] != "completed" or Path(mark["output"]) != raw
+                or load(Path(report))["raw_sha256"] != mark["sha256"] or sha(raw) != mark["sha256"]):
+            raise ValueError(f"Original raw receipt differs for {name}")
+        raws.append((raw, mark["sha256"]))
+    return raws
+
+
+def jobs_for(root, worker, panel, model, data, references=(), archived=None, whitespace=False):
     out = root / "jobs"
     jobs = []
 
     def add(name, lane, kind, target, argv, deps, extension, preferred=0, eta=120):
         jobs.append({"id": name, "lane": lane, "kind": kind, "worker": str(target),
                      "extension": extension, "deps": deps, "preferred": preferred,
-                     "priority": 0 if lane == "canary" else 10, "eta": eta,
+                     "priority": {"canary": 0, "pilot": 5, "eval": 10, "archive": 20}[lane], "eta": eta,
                      "argv": [*argv, "--output", str(out / (name + extension))]})
 
     common = ["--panel", str(panel), "--model", str(model)]
@@ -96,10 +117,26 @@ def jobs_for(root, worker, panel, model, data, references=()):
     gate = "DQL-canary-gate"
     add(gate, "canary", "cpu", worker, ["summarize", "--split", "canary", *score_args(technical)],
         technical, ".json")
+    if whitespace:
+        pilot = [shard("pilot", j * 4, 4, 1, j % 2, [gate]) for j in range(4)]
+        gate = "DQL-pilot-gate"
+        add(gate, "pilot", "cpu", worker, ["summarize", "--split", "pilot", *score_args(pilot)],
+            pilot, ".json")
     heldout = [shard("eval", j * 8, 8, 2, j % 2, [gate]) for j in range(8)]
+    originals = []
+    if archived is not None:
+        old_panel, old_worker, raw_inputs = archived
+        for j, (raw, pin) in enumerate(raw_inputs):
+            name = f"DQL-old-rescore-{j*8:03d}"
+            add(name, "archive", "cpu", worker, ["rescore", "--panel", str(old_panel), "--model", str(model),
+                "--raw", str(raw), "--fingerprint", pin, "--archive-worker", str(old_worker),
+                "--archive-worker-sha256", ARCHIVED_WORKER], [], ".json")
+            originals.append(name)
+        references = ["--reference-reports", *(str(out / f"{name}.json") for name in originals),
+                      "--reference-fingerprints", *(f"{{sha:{name}}}" for name in originals)]
     add("DQL-eval-summary", "eval", "cpu", worker,
         ["summarize", "--split", "eval", *score_args(heldout), *references],
-        heldout, ".json")
+        heldout + originals, ".json")
     return jobs
 
 
@@ -128,21 +165,31 @@ def launch(args):
     panel = root / "panel.json"
     if sha(args.source_panel) != ARCHIVED_PANEL:
         raise ValueError("Archived holdout digest differs")
+    whitespace = args.padding == "whitespace"
     subprocess.run([sys.executable, "-B", str(worker), "freeze-match", "--source-panel", str(args.source_panel),
-                    "--fingerprint", ARCHIVED_PANEL, "--model", str(model), "--panel", str(panel)],
+                    "--fingerprint", ARCHIVED_PANEL, "--model", str(model), "--panel", str(panel),
+                    "--padding", args.padding],
                    check=True, env=env)
-    shapes = panel_proof(args.source_panel, panel)
+    shapes = panel_proof(args.source_panel, panel, whitespace)
     controller = Path(__file__).resolve()
     config = {"host": HOST, "host_devices": DEVICES, "devices": [DEVICES[i] for i in SELECTED],
               "deadline": DEADLINE, "access": DEADLINE - 900, "source_root": str(source),
               "runtime": env["PYTHONPATH"], "queue_sha256": args.queue_sha256}
-    jobs = jobs_for(root, worker, panel, model, data, reference_args(args.source_panel.parent))
+    archive = args.source_panel.parent
+    if whitespace:
+        prior_worker = base / "tmp" / archive.name / worker.name
+        if sha(prior_worker) != ARCHIVED_WORKER:
+            raise ValueError("Original source worker checksum differs")
+        archived = (args.source_panel, prior_worker, original_raws(archive))
+        jobs = jobs_for(root, worker, panel, model, data, archived=archived, whitespace=True)
+    else:
+        jobs = jobs_for(root, worker, panel, model, data, reference_args(archive))
     (root / "plans").mkdir()
     plan = root / "plans" / "plan-00-delayed-query-length.json"
     save(plan, {"jobs": jobs, "pins": {str(worker): args.worker_sha256, str(controller): sha(controller),
                                       str(helper): CAMPAIGN_HELPER}})
     save(root / "config.json", config)
-    seal = {"deadline": DEADLINE, "device_indexes": SELECTED, "panel_sha256": sha(panel),
+    seal = {"deadline": DEADLINE, "device_indexes": SELECTED, "panel_sha256": sha(panel), "padding": args.padding,
             "source_panel_sha256": ARCHIVED_PANEL, "panel_query_lengths": shapes,
             "preflight_sha256": sha(root / "preflight.json"), "manifest_shas": {plan.name: sha(plan)},
             "jobs": dict(Counter(j["lane"] + ":" + j["kind"] for j in jobs))}
@@ -158,6 +205,7 @@ def main():
         parser.add_argument("--" + option, type=Path, required=True)
     parser.add_argument("--worker-sha256", required=True)
     parser.add_argument("--queue-sha256", required=True)
+    parser.add_argument("--padding", choices=("wording", "whitespace"), required=True)
     launch(parser.parse_args())
 
 
