@@ -4,7 +4,11 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from repetition_delayed_query import NONE, SIZES, THINK_END, assess, freeze, prefixes, tally
+from repetition_baseline import sha
+from repetition_delayed_query import (
+    KEEP, NONE, READ_ENDINGS, RESET, SIZES, THINK_END, assess, correct_eos_contrasts,
+    freeze, freeze_match, prefixes, tally,
+)
 
 
 class CharacterTokenizer:
@@ -52,6 +56,37 @@ class DelayedQueryTests(unittest.TestCase):
         self.assertTrue(opposite["opposite_eos"])
         self.assertTrue(censored["correct_without_eos"])
         self.assertEqual(tally([correct, opposite, censored])["delta"], 0)
+
+    def test_matched_panel_changes_only_read_query_and_keeps_its_token_prefix(self):
+        tok = CharacterTokenizer()
+        with tempfile.TemporaryDirectory() as d:
+            source, target = (Path(d) / name for name in ("source.json", "matched.json"))
+            freeze(tok, source, "fixture")
+            parent = json.loads(source.read_text())
+            for cases in parent["panels"].values():
+                for case in cases:
+                    query = case["query"]
+                    query["apply"] = [42] * (len(query["read"]) + len(READ_ENDINGS[0]) + 1)
+            source.write_text(json.dumps(parent))
+            freeze_match(tok, source, sha(source), target, "fixture")
+            frozen = json.loads(target.read_text())
+        for split, cases in frozen["panels"].items():
+            for old, new in zip(parent["panels"][split], cases, strict=True):
+                self.assertEqual({k: v for k, v in old.items() if k != "query"}, {
+                    k: v for k, v in new.items() if k not in ("query", "original_read_sha256")})
+                self.assertEqual(new["query"]["apply"], old["query"]["apply"])
+                self.assertEqual(new["query"]["read"][:len(old["query"]["read"])], old["query"]["read"])
+                self.assertEqual(len(new["query"]["read"]), len(new["query"]["apply"]))
+
+    def test_matched_interaction_uses_correct_eos_without_rewarding_wrong_answers(self):
+        rows = [{"id": "x", "draw": 0, "variant": 0, "mode": mode, "arm": arm,
+                 "correct_eos": correct, "opposite_eos": not correct}
+                for mode, arm, correct in (("read", KEEP, False), ("read", RESET, True),
+                                           ("apply", KEEP, True), ("apply", RESET, False))]
+        _, changes = correct_eos_contrasts(rows)
+        self.assertEqual(changes["read"]["x",0,0], 1)
+        self.assertEqual(changes["apply"]["x",0,0], -1)
+        self.assertEqual(changes["read_minus_apply"]["x",0,0], 2)
 
 
 if __name__ == "__main__":

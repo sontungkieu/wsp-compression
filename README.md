@@ -501,6 +501,11 @@ read or arithmetic query only after prefix prefill. It tests donor convolution
 reset, intact cache and fresh-record controls at the same post-marker cap.
 Its pilot summary gates the held-out run on signed record use with exact
 question-only pair parity.
+`freeze-match` retains the original cases and apply query and extends the
+read query to the same token length. The matched evaluation compares keep
+against reset-conv at the 256/512 cuts of one trace. `summarize` reports the
+paired correct-plus-EOS interaction and optionally checks it against the
+checksum-pinned original score shards.
 `repetition_delayed_campaign.py` pins the cached artifacts and launches the
 two canaries, the 16-ID pilot, and the gated 64-ID holdout on the assigned
 General Embedding node. Its snapshot includes live GPU ownership and release

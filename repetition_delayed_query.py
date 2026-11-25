@@ -27,6 +27,20 @@ ARMS = {"canary": (KEEP, RESET, NONE, FRESH, SELF), "pilot": (KEEP, NONE, FRESH)
         "eval": (KEEP, RESET, NONE, FRESH)}
 FIELDS = ("conv_states",)
 KV = ("key_cache", "value_cache")
+MATCHED = "query-length-matched-v1"
+MATCHED_ARMS = {"canary": (KEEP, RESET, NONE, SELF), "eval": (KEEP, RESET)}
+READ_ENDINGS = (
+    "Give the exact recorded number without adding an explanation.",
+    "Give only the exact recorded number without adding any explanation.",
+    "Write the exact number as it appears in the record.",
+    "Answer with the number exactly as it appears in the record.",
+    "Return the recorded number exactly as written in the draft record.",
+    "Keep the recorded value unchanged and use it as your answer.",
+    "Answer with the recorded value itself, exactly as it was saved.",
+    "Your answer should be exactly the number shown in the draft record.",
+    "Use the recorded number itself, without changing or explaining it.",
+    "Copy the recorded number exactly without changing the value.",
+)
 
 
 def encode(tokenizer, text):
@@ -98,6 +112,49 @@ def freeze(tok, path, tokenizer_sha):
         plans[split] = group
     save(path, {"format": 1, "panels": plans, "families": FAMILIES, "tokenizer_sha256": tokenizer_sha,
                 "scope": "synthetic hidden record, new query forced only after cached prefill"})
+
+
+def matching_read(tok, original, length):
+    read = tok.decode(original, skip_special_tokens=False)
+    if encode(tok, read) != original or not read.endswith("\n") or len(original) >= length:
+        raise ValueError("archived read query cannot be extended without changing its tokens")
+    for ending in READ_ENDINGS:
+        candidate = encode(tok, read + ending + "\n")
+        if (len(candidate) == length and candidate[:len(original)] == original
+                and set(candidate).isdisjoint(set(tok.all_special_ids) | {THINK_END})):
+            return candidate
+    raise ValueError(f"no registered read wording matches {length} tokens")
+
+
+def freeze_match(tok, source, fingerprint, path, tokenizer_sha):
+    if path.exists():
+        raise FileExistsError(path)
+    if sha(source) != fingerprint:
+        raise ValueError("original delayed query panel checksum changed")
+    plan = load(source)
+    if (plan["format"] != 1 or plan.get("protocol") is not None or plan["tokenizer_sha256"] != tokenizer_sha
+            or any(len(plan["panels"][split]) != SIZES[split] for split in MATCHED_ARMS)):
+        raise ValueError("expected the original complete delayed query panel and tokenizer")
+    panels = {}
+    for split in MATCHED_ARMS:
+        panels[split] = []
+        for case in plan["panels"][split]:
+            query = case["query"]
+            matched = matching_read(tok, query["read"], len(query["apply"]))
+            panels[split].append(case | {"query": query | {"read": matched},
+                                        "original_read_sha256": packed_hash(query["read"])})
+    save(path, {"format": 1, "protocol": MATCHED, "source_panel_sha256": fingerprint,
+                "panels": panels, "families": plan["families"], "tokenizer_sha256": tokenizer_sha,
+                "scope": "original records and apply query; original read clause with a matched-length extension"})
+
+
+def protocol_arms(plan, split):
+    protocol = plan.get("protocol")
+    if protocol == MATCHED:
+        return MATCHED_ARMS[split]
+    if protocol is not None:
+        raise ValueError("unrecognized delayed query protocol")
+    return ARMS[split]
 
 
 def prefill(runtime, ids, width):
@@ -178,7 +235,7 @@ def batch(runtime, case, mode, draw, post_cap, arms):
         result[arm] = [trace | {"arm": arm, "variant": v, "mode": mode, "prefix_sha256": packed_hash(ids[v])}
                        for v, trace in enumerate(traces)]
         audit[arm] = proof
-    if tokens(result[NONE][0]) != tokens(result[NONE][1]):
+    if NONE in result and tokens(result[NONE][0]) != tokens(result[NONE][1]):
         raise ValueError("no-record pair leaked value into generation")
     for arm in (RESET, SELF):
         if arm in audit and any(audit[arm][k] != audit[KEEP][k] for k in ("kv", "mask_sha256", "width")):
@@ -196,6 +253,10 @@ def run(args):
     cases = plan["panels"][args.split][args.start:args.start + args.count]
     if len(cases) != args.count or not cases or args.output.exists():
         raise ValueError("require a complete frozen shard and a fresh output")
+    arms = protocol_arms(plan, args.split)
+    if plan.get("protocol") == MATCHED and (any(len(c["query"]["read"]) != len(c["query"]["apply"]) for c in cases)
+            or (args.split == "eval" and (args.cap != 512 or args.draws != 2))):
+        raise ValueError("matched eval requires equal query length, two draws and a 512-token trace")
     r = runtime_for(args)
     if r.manifest["tokenizer_sha256"] != plan["tokenizer_sha256"]:
         raise ValueError("frozen IDs came from a different tokenizer")
@@ -207,13 +268,13 @@ def run(args):
 
         emit({"kind": "manifest", "worker_sha256_delayed": sha(Path(__file__)), "panel_sha256": sha(args.panel),
               "split": args.split, "start": args.start, "count": args.count, "draws": args.draws,
-              "cap": args.cap, "arms": ARMS[args.split], **r.manifest})
+              "cap": args.cap, "arms": arms, "protocol": plan.get("protocol"), **r.manifest})
         for item in cases:
             for draw in range(args.draws):
                 for mode in MODES:
                     if time.time() >= args.deadline - 120:
                         raise TimeoutError("delayed query shard nearing its deadline")
-                    raw, audit = batch(r, item, mode, draw, args.cap, ARMS[args.split])
+                    raw, audit = batch(r, item, mode, draw, args.cap, arms)
                     emit({"kind": "audit", "id": item["id"], "mode": mode, "draw": draw, "arms": audit})
                     for pair in raw.values():
                         for trace in pair:
@@ -243,11 +304,12 @@ def score(args, tok):
         raise ValueError("delayed query raw checksum changed")
     with args.raw.open() as f:
         h, *body, end = map(json.loads, f)
+    plan = load(args.panel)
     if (h["worker_sha256_delayed"] != sha(Path(__file__)) or h["panel_sha256"] != sha(args.panel)
             or h["tokenizer_sha256"] != sha(args.model/"tokenizer.json") or end["kind"] != "complete"
-            or tuple(h["arms"]) != ARMS[h["split"]]):
+            or tuple(h["arms"]) != protocol_arms(plan, h["split"]) or h.get("protocol") != plan.get("protocol")):
         raise ValueError("delayed query provenance changed")
-    cohort = load(args.panel)["panels"][h["split"]][h["start"]:h["start"]+h["count"]]
+    cohort = plan["panels"][h["split"]][h["start"]:h["start"]+h["count"]]
     items = {c["id"]: c for c in cohort}
     cells, audits = {}, set()
     for row in body:
@@ -286,30 +348,74 @@ def tally(rows):
     return {"n": d, **counts, "delta": (counts["correct_eos"]-counts["opposite_eos"])/d}
 
 
-def summarize(args):
+def read_scores(paths, fingerprints):
     loaded = []
-    for path, fingerprint in zip(args.reports, args.fingerprints, strict=True):
+    for path, fingerprint in zip(paths, fingerprints, strict=True):
         if sha(path) != fingerprint:
             raise ValueError("delayed query score receipt changed")
         loaded.append(load(path))
-    expected = {c["id"] for c in load(args.panel)["panels"][args.split]}
-    result = {"split": args.split, "panel_sha256": sha(args.panel), "score_shas": args.fingerprints, "windows": {}}
+    return loaded
+
+
+def correct_eos_contrasts(rows):
+    keyed = {(r["id"],r["draw"],r["variant"],r["mode"],r["arm"]): int(r["correct_eos"]) for r in rows}
+    cells = {(p,d,v) for p,d,v,_,_ in keyed}
+    if len(keyed) != len(cells)*4 or len(rows) != len(keyed):
+        raise ValueError("incorrect matched read/apply arm matrix")
+    differences = {m: {key: keyed[(*key,m,RESET)]-keyed[(*key,m,KEEP)] for key in cells} for m in MODES}
+    return keyed, differences | {"read_minus_apply": {key: differences["read"][key]-differences["apply"][key]
+                                                      for key in cells}}
+
+
+def interval_by_id(values):
+    grouped = defaultdict(list)
+    for (pid,_,_), value in sorted(values.items()):
+        grouped[pid].append(value)
+    return paired_interval(dict(grouped))
+
+
+def original_reference(args, plan, first):
+    if args.reference_reports is None and args.reference_fingerprints is None:
+        return None
+    if plan.get("protocol") != MATCHED or args.split != "eval" or not args.reference_reports or not args.reference_fingerprints:
+        raise ValueError("original references are for a complete length-matched eval only")
+    loaded = read_scores(args.reference_reports, args.reference_fingerprints)
+    for report in loaded:
+        h = report["header"]
+        if (h.get("protocol") is not None or h["panel_sha256"] != plan["source_panel_sha256"]
+                or h["split"] != "eval" or tuple(h["arms"]) != ARMS["eval"] or h["draws"] != 2 or h["cap"] != 512
+                or any(h[key] != first[key] for key in ("tokenizer_sha256","checkpoint","runtime","sampling"))):
+            raise ValueError("original score reference is from a different protocol or runtime")
+    return loaded
+
+
+def summarize(args):
+    loaded = read_scores(args.reports, args.fingerprints)
+    plan = load(args.panel)
+    expected = {c["id"] for c in plan["panels"][args.split]}
+    first = loaded[0]["header"]
+    arms = protocol_arms(plan, args.split)
+    reference = original_reference(args, plan, first)
+    result = {"split": args.split, "panel_sha256": sha(args.panel), "score_shas": args.fingerprints,
+              "protocol": plan.get("protocol"), "reference_score_shas": args.reference_fingerprints,
+              "windows": {}}
+    if any(r["header"]["split"] != args.split or r["header"]["panel_sha256"] != result["panel_sha256"]
+           or tuple(r["header"]["arms"]) != arms or r["header"].get("protocol") != plan.get("protocol")
+           or r["header"]["draws"] != first["draws"] or r["header"]["cap"] != first["cap"] for r in loaded):
+        raise ValueError("mixed score protocols")
     for cap in loaded[0]["windows"]:
-        if any(r["header"]["split"] != args.split or r["header"]["panel_sha256"] != result["panel_sha256"]
-               or r["header"]["draws"] != loaded[0]["header"]["draws"] for r in loaded):
-            raise ValueError("mixed score protocols")
         rows = [row for report in loaded for row in report["windows"][cap]]
         keys = [(r["id"],r["draw"],r["mode"],r["arm"],r["variant"]) for r in rows]
         if len(set(keys)) != len(keys) or set(keys) != {(p,d,m,a,v) for p in expected for m in MODES
-                for a in ARMS[args.split] for v in (0,1) for d in range(loaded[0]["header"]["draws"])}:
+                for a in arms for v in (0,1) for d in range(first["draws"])}:
             raise ValueError("expected all disjoint scored rows on the frozen panel")
         tables, ci, vs_keep = {}, {}, {}
         for mode in MODES:
             block = [r for r in rows if r["mode"] == mode]
-            tables[mode] = {arm: tally([r for r in block if r["arm"] == arm]) for arm in ARMS[args.split]}
+            tables[mode] = {arm: tally([r for r in block if r["arm"] == arm]) for arm in arms}
             ci[mode] = {}
             paired = {}
-            for arm in ARMS[args.split]:
+            for arm in arms:
                 paired[arm] = {(r["id"],r["draw"],r["variant"]): int(r["correct_eos"])-int(r["opposite_eos"])
                                for r in block if r["arm"] == arm}
                 by_id = defaultdict(list)
@@ -324,32 +430,55 @@ def summarize(args):
                 for key, value in values.items():
                     by_id[key[0]].append(value - paired[KEEP][key])
                 vs_keep[mode][arm] = paired_interval(dict(by_id))
-        result["windows"][cap] = {"tables": tables, "signed_ci": ci, "delta_vs_keep_pp": vs_keep}
-    primary = result["windows"][str(loaded[0]["header"]["cap"])]["tables"]
+        window = {"tables": tables, "signed_ci": ci, "delta_vs_keep_pp": vs_keep}
+        if plan.get("protocol") == MATCHED:
+            matched_rows = [r for r in rows if r["arm"] in (KEEP,RESET)]
+            paired, contrasts = correct_eos_contrasts(matched_rows)
+            window["correct_eos_reset_minus_keep"] = {k: interval_by_id(v) for k,v in contrasts.items()}
+            if reference is not None:
+                original = [r for report in reference for r in report["windows"][cap] if r["arm"] in (KEEP,RESET)]
+                reference_cells, reference_effects = correct_eos_contrasts(original)
+                if reference_cells.keys() != paired.keys():
+                    raise ValueError("reference and ablation are not paired by prompt, mode, draw and value")
+                window["original_correct_eos_reset_minus_keep"] = {k: interval_by_id(v) for k,v in reference_effects.items()}
+                window["matched_minus_original_interaction"] = interval_by_id({
+                    k: v-reference_effects["read_minus_apply"][k] for k,v in contrasts["read_minus_apply"].items()})
+                window["unchanged_apply_correct_eos_agreement"] = sum(
+                    paired[k] == reference_cells[k] for k in paired if k[3] == "apply")
+        result["windows"][cap] = window
+    primary = result["windows"][str(first["cap"])]["tables"]
     result["gate_passed"] = (args.split != "pilot" or all(
         primary[m][FRESH]["delta"] >= .25 and primary[m][KEEP]["delta"] >= .125
         and primary[m][NONE]["delta"] == 0 for m in MODES))
+    if plan.get("protocol") == MATCHED and args.split == "canary":
+        rows = [row for report in loaded for row in report["windows"][str(first["cap"])]]
+        correct_read = {r["id"] for r in rows if r["arm"] == KEEP and r["mode"] == "read" and r["correct_eos"]}
+        result["gate_passed"] = correct_read == expected
     return result
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("action", choices=("freeze", "run", "score", "summarize"))
-    for key in ("panel", "model", "checkpoint", "data", "raw", "output"):
+    p.add_argument("action", choices=("freeze", "freeze-match", "run", "score", "summarize"))
+    for key in ("panel", "source-panel", "model", "checkpoint", "data", "raw", "output"):
         p.add_argument("--"+key, type=Path)
     p.add_argument("--split", choices=tuple(ARMS))
     p.add_argument("--fingerprint")
     p.add_argument("--reports", type=Path, nargs="+")
     p.add_argument("--fingerprints", nargs="+")
+    p.add_argument("--reference-reports", type=Path, nargs="+")
+    p.add_argument("--reference-fingerprints", nargs="+")
     for k,v in (("start",0), ("count",2), ("draws",1), ("cap",512), ("deadline",None)):
         p.add_argument("--"+k, type=int, default=v)
     args = p.parse_args()
-    if args.action in ("freeze", "score"):
+    if args.action in ("freeze", "freeze-match", "score"):
         from transformers import AutoTokenizer
 
         tok = AutoTokenizer.from_pretrained(args.model, local_files_only=True)
     if args.action == "freeze":
         freeze(tok, args.panel, sha(args.model/"tokenizer.json"))
+    elif args.action == "freeze-match":
+        freeze_match(tok, args.source_panel, args.fingerprint, args.panel, sha(args.model/"tokenizer.json"))
     elif args.action == "run":
         if args.start < 0 or args.count < 1 or args.draws < 1 or not 64 <= args.cap <= 512 or args.deadline is None:
             p.error("run requires a range, a 64–512 post-marker cap and the allocation deadline")
@@ -360,7 +489,7 @@ def main():
         result = score(args, tok) if args.action == "score" else summarize(args)
         save(args.output, result)
         if args.action == "summarize" and not result["gate_passed"]:
-            raise SystemExit("pilot did not meet the preregistered record-use gate")
+            raise SystemExit("record-use check did not meet the preregistered gate")
 
 
 if __name__ == "__main__":
