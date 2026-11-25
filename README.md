@@ -590,7 +590,10 @@ conv reset at READ through later state restoration.
 `repetition_delayed_restore_audit.py` rechecks raw restoration receipts and
 recomputes seeded token and EOS parity with a pinned CPU scorer.
 `repetition_delayed_matrix_campaign.py` adds a separate matrix-only restoration
-control on the first 16 balanced cases from the restoration holdout.
+control on the first 16 balanced cases from the restoration holdout. Its
+`--second-block` mode verifies the first block's canary receipts and evaluates
+IDs 16–31 in a fresh run. `repetition_delayed_restore_audit.py --compare-controls`
+checks exact shared-control traces against the earlier restoration holdout.
 `repetition_delayed_pulse_audit.py` pairs the early and READ-boundary pulses on
 the same IDs and verifies both sets of transport receipts.
 `repetition_delayed_value_audit.py` joins verified 0.8B readout and crossing
