@@ -530,6 +530,10 @@ variation with paired confidence intervals.
 `repetition_delayed_numeric.py` teacher-forces both candidate numerals after
 the same newline and reports paired correct-versus-opposite log odds and
 the total probability mass of the two numeral continuations.
+`repetition_delayed_value_cross.py` swaps the batch rows of convolution,
+recurrent matrix and attention caches independently on value-only record
+pairs. All three swaps together must reconstruct the opposite row's
+conditional numeral scores.
 The numeric parser stops at the assistant turn marker, while success still
 requires the configured EOS inside the token budget. `rescore` uses the
 original checksum-pinned rollout worker to validate archived raw traces.

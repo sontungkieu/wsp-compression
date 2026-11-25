@@ -52,7 +52,7 @@ def panel_cases(args, runtime):
     return panels
 
 
-def conditional_scores(runtime, packed, query, scaffold, numeral, arm, donors):
+def conditional_scores(runtime, packed, query, scaffold, numeral, arm, donors, scoring_hook=receiver):
     torch = runtime.torch
     width = packed["input_ids"].shape[-1]
     stop = min(runtime.eos)
@@ -72,7 +72,7 @@ def conditional_scores(runtime, packed, query, scaffold, numeral, arm, donors):
         do_sample=False, use_cache=True, max_new_tokens=len(forced), eos_token_id=sorted(runtime.eos),
         pad_token_id=runtime.pad,
     )
-    with receiver(runtime, width, query, arm, donors, audit, marker):
+    with scoring_hook(runtime, width, query, arm, donors, audit, marker):
         out = runtime.model.generate(**packed, generation_config=cfg, logits_processor=[ForcedNumeral()],
                                      **runtime.defaults)
     if out[:, width:].tolist() != [forced, forced] or len(logps) != len(numeral):
@@ -82,6 +82,12 @@ def conditional_scores(runtime, packed, query, scaffold, numeral, arm, donors):
 
 def stable_logsumexp(a, b):
     return max(a, b) + math.log1p(math.exp(-abs(a - b)))
+
+
+def numerical_interval(groups):
+    paired = paired_interval(groups)
+    return {"delta_nats": paired["delta_pp"] / 100,
+            "ci95_nats": [x / 100 for x in paired["ci95_pp"]], "prompts": paired["prompts"]}
 
 
 def evidence(runtime, case, placement):
@@ -145,11 +151,6 @@ def summarize(args):
             if row["id"] in merged or set(row["placements"]) != set(PLACEMENTS):
                 raise ValueError("duplicate or incomplete READ numeral row")
             merged[row["id"]] = row["placements"]
-
-    def numerical_interval(groups):
-        paired = paired_interval(groups)
-        return {"delta_nats": paired["delta_pp"] / 100,
-                "ci95_nats": [x / 100 for x in paired["ci95_pp"]], "prompts": paired["prompts"]}
 
     def metric(spec, field):
         placement, arm = spec
