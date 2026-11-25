@@ -534,6 +534,8 @@ the total probability mass of the two numeral continuations.
 recurrent matrix and attention caches independently on value-only record
 pairs. All three swaps together must reconstruct the opposite row's
 conditional numeral scores.
+`repetition_delayed_replication.py` freezes new record values and IDs while
+preserving the archived 6+6 token layout and family-by-slot balance.
 The numeric parser stops at the assistant turn marker, while success still
 requires the configured EOS inside the token budget. `rescore` uses the
 original checksum-pinned rollout worker to validate archived raw traces.
