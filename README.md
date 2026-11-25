@@ -578,6 +578,8 @@ before admitting the next probe within the allocation.
 restoration holdout on disjoint balanced record panels after their verified
 predecessor releases. `repetition_delayed_transfer_campaign.py` verifies the
 cached 2B checkpoint and compares crossed cache values on matched 0.8B cases.
+`repetition_delayed_value_audit.py` joins verified 0.8B readout and crossing
+shards and counts paired numeral preference changes by record template and slot.
 `repetition_delayed_length_audit.py` verifies unchanged APPLY prefixes, seeds
 and exact continuation tokens against checksummed shards. Its
 `--position-effects` option reports paired READ differences by cache arm.
