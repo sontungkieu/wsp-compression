@@ -51,20 +51,22 @@ def launch(args):
     live = preflight()
     if not set(SELECTED) <= set(live["idle"]):
         raise ValueError("Expected GPU 1 and 3 idle after the cache probes")
-    minimum = 1740 if args.count == 64 else 1150
+    minimum = 1740 if args.mode == "timing" else 2050 if args.count == 64 else 1220
     if time.time() >= DEADLINE - minimum:
         raise TimeoutError("Insufficient time for the selected independent holdout")
     base, root, source = args.base, args.root, args.source
     if root.parent != base / "runs" or source.parent != base / "tmp" or (root / "launch.json").exists():
         raise ValueError("Expected a fresh scoped WSP run and source")
-    previous = base / "runs" / "repetition-delayed-query-value-cross-20261126-v1"
+    previous_slug = ("repetition-delayed-query-value-cross-20261126-v1" if args.mode == "timing"
+                     else "repetition-delayed-query-replication-20261126-v1")
+    previous = base / "runs" / previous_slug
     status_path, release_path = previous / "status.json", previous / "release.json"
     release, prior = load(release_path), load(previous / "config.json")
     devices = [DEVICES[i] for i in SELECTED]
     if (release["host"] != HOST or release["state"] != "completed" or release["campaign_compute"]
             or release["status_sha256"] != sha(status_path) or prior["devices"] != devices
             or [row[1] for row in release["allocation"]] != devices):
-        raise ValueError("Expected a verified completed cache crossing and exact device release")
+        raise ValueError("Expected verified predecessor completion and exact device release")
     panel, queue = root / "panel.json", source / "repetition_followup_queue.py"
     if sha(panel) != args.panel_sha256 or load(panel)["source_panel_sha256"] != PANEL:
         raise ValueError("Independent panel byte digest or archive lineage differs")
