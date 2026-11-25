@@ -501,6 +501,10 @@ read or arithmetic query only after prefix prefill. It tests donor convolution
 reset, intact cache and fresh-record controls at the same post-marker cap.
 Its pilot summary gates the held-out run on signed record use with exact
 question-only pair parity.
+`repetition_delayed_campaign.py` pins the cached artifacts and launches the
+two canaries, the 16-ID pilot, and the gated 64-ID holdout on the assigned
+General Embedding node. Its snapshot includes live GPU ownership and release
+evidence.
 `repetition_motif_path_audit.py` checks the first confirmed return to the
 original motif and natural phase closure at period-scaled token budgets.
 For input produced by the extended baseline worker, the motif replay
