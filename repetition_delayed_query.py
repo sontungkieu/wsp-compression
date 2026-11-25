@@ -29,6 +29,8 @@ FIELDS = ("conv_states",)
 KV = ("key_cache", "value_cache")
 MATCHED = "query-length-matched-v1"
 PADDED = "query-length-whitespace-v1"
+PAD_AFTER = "query-whitespace-after-v1"
+LENGTH_PROTOCOLS = (MATCHED, PADDED, PAD_AFTER)
 MATCHED_ARMS = {"canary": (KEEP, RESET, NONE, SELF), "eval": (KEEP, RESET)}
 PADDED_ARMS = MATCHED_ARMS | {"pilot": (KEEP, RESET)}
 READ_ENDINGS = (
@@ -177,9 +179,46 @@ def freeze_match(tok, source, fingerprint, path, tokenizer_sha, padding="wording
                 "scope": "original records and apply query; original read clause with matched-length " + padding})
 
 
+def freeze_after(tok, source, fingerprint, before, before_sha, path, tokenizer_sha):
+    if path.exists():
+        raise FileExistsError(path)
+    if sha(source) != fingerprint or sha(before) != before_sha:
+        raise ValueError("one of the two archived source panels changed")
+    original, padded = load(source), load(before)
+    if (original["format"] != 1 or original.get("protocol") is not None or padded["format"] != 1
+            or padded.get("protocol") != PADDED or padded["source_panel_sha256"] != fingerprint
+            or original["tokenizer_sha256"] != tokenizer_sha or padded["tokenizer_sha256"] != tokenizer_sha):
+        raise ValueError("expected the original and before-padding panels from one tokenizer")
+    panels = {}
+    excluded = set(tok.all_special_ids) | {THINK_END}
+    for split in MATCHED_ARMS:
+        pairs = list(zip(original["panels"][split], padded["panels"][split], strict=True))
+        if len(pairs) != SIZES[split]:
+            raise ValueError("incomplete source split")
+        panels[split] = []
+        for old, front in pairs:
+            query = old["query"]
+            read, source_read = query["read"], front["query"]["read"]
+            count = len(query["apply"]) - len(read)
+            pad = source_read[1:1+count]
+            expected = old | {"query": query | {"read": source_read}, "original_read_sha256": packed_hash(read)}
+            if (front != expected or count <= 0 or len(source_read) != len(query["apply"])
+                    or source_read[:1] + source_read[1+count:] != read or set(pad) & excluded
+                    or any(not tok.decode([token], skip_special_tokens=False).isspace() for token in pad)):
+                raise ValueError("the before-padding pair changes more than the whitespace placement")
+            after = read + pad
+            decoded = tok.decode(read, skip_special_tokens=False) + tok.decode(pad, skip_special_tokens=False)
+            if tok.decode(after, skip_special_tokens=False) != decoded:
+                raise ValueError("moving padding changed the decoded read clause")
+            panels[split].append(expected | {"query": query | {"read": after}})
+    save(path, {"format": 1, "protocol": PAD_AFTER, "source_panel_sha256": fingerprint,
+                "before_panel_sha256": before_sha, "panels": panels, "families": original["families"],
+                "tokenizer_sha256": tokenizer_sha, "scope": "move the exact before-READ whitespace block after READ"})
+
+
 def protocol_arms(plan, split):
     protocol = plan.get("protocol")
-    if protocol == MATCHED:
+    if protocol in (MATCHED, PAD_AFTER):
         return MATCHED_ARMS[split]
     if protocol == PADDED:
         return PADDED_ARMS[split]
@@ -285,7 +324,7 @@ def run(args):
     if len(cases) != args.count or not cases or args.output.exists():
         raise ValueError("require a complete frozen shard and a fresh output")
     arms = protocol_arms(plan, args.split)
-    if plan.get("protocol") in (MATCHED, PADDED) and (any(len(c["query"]["read"]) != len(c["query"]["apply"]) for c in cases)
+    if plan.get("protocol") in LENGTH_PROTOCOLS and (any(len(c["query"]["read"]) != len(c["query"]["apply"]) for c in cases)
             or (args.split == "eval" and (args.cap != 512 or args.draws != 2))):
         raise ValueError("matched eval requires equal query length, two draws and a 512-token trace")
     r = runtime_for(args)
@@ -410,19 +449,25 @@ def interval_by_id(values):
     return paired_interval(dict(grouped))
 
 
-def original_reference(args, plan, first):
+def score_reference(args, plan, first):
+    after = plan.get("protocol") == PAD_AFTER
     if args.reference_reports is None and args.reference_fingerprints is None:
+        if after and args.split == "eval":
+            raise ValueError("pad-position eval requires scored before-padding references")
         return None
-    if (plan.get("protocol") not in (MATCHED, PADDED) or args.split != "eval"
+    if (plan.get("protocol") not in LENGTH_PROTOCOLS or args.split != "eval"
             or not args.reference_reports or not args.reference_fingerprints):
-        raise ValueError("original references are for a complete length-matched eval only")
+        raise ValueError("references are for a complete length-matched eval only")
     loaded = read_scores(args.reference_reports, args.reference_fingerprints)
+    expected_protocol = PADDED if after else None
+    expected_panel = plan["before_panel_sha256"] if after else plan["source_panel_sha256"]
+    expected_arms = PADDED_ARMS["eval"] if after else ARMS["eval"]
     for report in loaded:
         h = report["header"]
-        if (h.get("protocol") is not None or h["panel_sha256"] != plan["source_panel_sha256"]
-                or h["split"] != "eval" or tuple(h["arms"]) != ARMS["eval"] or h["draws"] != 2 or h["cap"] != 512
+        if (h.get("protocol") != expected_protocol or h["panel_sha256"] != expected_panel
+                or h["split"] != "eval" or tuple(h["arms"]) != expected_arms or h["draws"] != 2 or h["cap"] != 512
                 or any(h[key] != first[key] for key in ("tokenizer_sha256","checkpoint","runtime","sampling"))):
-            raise ValueError("original score reference is from a different protocol or runtime")
+            raise ValueError("score reference is from a different protocol or runtime")
     return loaded
 
 
@@ -432,7 +477,7 @@ def summarize(args):
     expected = {c["id"] for c in plan["panels"][args.split]}
     first = loaded[0]["header"]
     arms = protocol_arms(plan, args.split)
-    reference = original_reference(args, plan, first)
+    reference = score_reference(args, plan, first)
     boundary = loaded[0].get("answer_boundary")
     if any(r.get("answer_boundary") != boundary for r in loaded + (reference or [])):
         raise ValueError("cannot compare scores with mixed answer boundaries")
@@ -471,7 +516,7 @@ def summarize(args):
                     by_id[key[0]].append(value - paired[KEEP][key])
                 vs_keep[mode][arm] = paired_interval(dict(by_id))
         window = {"tables": tables, "signed_ci": ci, "delta_vs_keep_pp": vs_keep}
-        if plan.get("protocol") in (MATCHED, PADDED):
+        if plan.get("protocol") in LENGTH_PROTOCOLS:
             matched_rows = [r for r in rows if r["arm"] in (KEEP,RESET)]
             paired, contrasts = correct_eos_contrasts(matched_rows)
             window["correct_eos_reset_minus_keep"] = {k: interval_by_id(v) for k,v in contrasts.items()}
@@ -480,9 +525,20 @@ def summarize(args):
                 reference_cells, reference_effects = correct_eos_contrasts(original)
                 if reference_cells.keys() != paired.keys():
                     raise ValueError("reference and ablation are not paired by prompt, mode, draw and value")
-                window["original_correct_eos_reset_minus_keep"] = {k: interval_by_id(v) for k,v in reference_effects.items()}
-                window["matched_minus_original_interaction"] = interval_by_id({
-                    k: v-reference_effects["read_minus_apply"][k] for k,v in contrasts["read_minus_apply"].items()})
+                interaction = interval_by_id({k: v-reference_effects["read_minus_apply"][k]
+                                              for k,v in contrasts["read_minus_apply"].items()})
+                intervals = {k: interval_by_id(v) for k,v in reference_effects.items()}
+                if plan.get("protocol") == PAD_AFTER:
+                    window["before_correct_eos_reset_minus_keep"] = intervals
+                    window["before_correct_eos_counts"] = {mode: {arm: sum(
+                        value for key,value in reference_cells.items() if key[3:] == (mode,arm))
+                        for arm in (KEEP,RESET)} for mode in MODES}
+                    window["after_minus_before_read_reset_effect"] = interval_by_id({
+                        k: v-reference_effects["read"][k] for k,v in contrasts["read"].items()})
+                    window["after_minus_before_interaction"] = interaction
+                else:
+                    window["original_correct_eos_reset_minus_keep"] = intervals
+                    window["matched_minus_original_interaction"] = interaction
                 window["unchanged_apply_correct_eos_agreement"] = sum(
                     paired[k] == reference_cells[k] for k in paired if k[3] == "apply")
         result["windows"][cap] = window
@@ -504,11 +560,12 @@ def summarize(args):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("action", choices=("freeze", "freeze-match", "run", "score", "rescore", "summarize"))
-    for key in ("panel", "source-panel", "archive-worker", "model", "checkpoint", "data", "raw", "output"):
+    p.add_argument("action", choices=("freeze", "freeze-match", "freeze-after", "run", "score", "rescore", "summarize"))
+    for key in ("panel", "source-panel", "before-panel", "archive-worker", "model", "checkpoint", "data", "raw", "output"):
         p.add_argument("--"+key, type=Path)
     p.add_argument("--split", choices=tuple(ARMS))
     p.add_argument("--fingerprint")
+    p.add_argument("--before-fingerprint")
     p.add_argument("--padding", choices=("wording", "whitespace"), default="wording")
     p.add_argument("--archive-worker-sha256")
     p.add_argument("--reports", type=Path, nargs="+")
@@ -518,7 +575,7 @@ def main():
     for k,v in (("start",0), ("count",2), ("draws",1), ("cap",512), ("deadline",None)):
         p.add_argument("--"+k, type=int, default=v)
     args = p.parse_args()
-    if args.action in ("freeze", "freeze-match", "score", "rescore"):
+    if args.action in ("freeze", "freeze-match", "freeze-after", "score", "rescore"):
         from transformers import AutoTokenizer
 
         tok = AutoTokenizer.from_pretrained(args.model, local_files_only=True)
@@ -526,6 +583,9 @@ def main():
         freeze(tok, args.panel, sha(args.model/"tokenizer.json"))
     elif args.action == "freeze-match":
         freeze_match(tok, args.source_panel, args.fingerprint, args.panel, sha(args.model/"tokenizer.json"), args.padding)
+    elif args.action == "freeze-after":
+        freeze_after(tok, args.source_panel, args.fingerprint, args.before_panel, args.before_fingerprint,
+                     args.panel, sha(args.model/"tokenizer.json"))
     elif args.action == "run":
         if args.start < 0 or args.count < 1 or args.draws < 1 or not 64 <= args.cap <= 512 or args.deadline is None:
             p.error("run requires a range, a 64–512 post-marker cap and the allocation deadline")

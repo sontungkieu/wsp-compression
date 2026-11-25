@@ -7,7 +7,7 @@ import unittest
 from repetition_baseline import sha
 from repetition_delayed_query import (
     KEEP, NONE, READ_ENDINGS, RESET, SIZES, THINK_END, assess, correct_eos_contrasts,
-    freeze, freeze_match, prefixes, tally, whitespace_read,
+    freeze, freeze_after, freeze_match, prefixes, tally, whitespace_read,
 )
 
 
@@ -106,6 +106,32 @@ class DelayedQueryTests(unittest.TestCase):
         self.assertEqual(padded[:1] + padded[13:], query)
         self.assertTrue(tok.decode(padded[1:13]).isspace())
         self.assertEqual(padded, whitespace_read(tok, query, len(query) + 12))
+
+    def test_after_placement_moves_only_the_exact_pinned_whitespace_block(self):
+        tok = CharacterTokenizer()
+        with tempfile.TemporaryDirectory() as d:
+            original, before, after = (Path(d) / name for name in ("original.json", "before.json", "after.json"))
+            freeze(tok, original, "fixture")
+            source = json.loads(original.read_text())
+            for cases in source["panels"].values():
+                for case in cases:
+                    q = case["query"]
+                    q["apply"] = [42] * (len(q["read"]) + 12)
+            original.write_text(json.dumps(source))
+            freeze_match(tok, original, sha(original), before, "fixture", padding="whitespace")
+            freeze_after(tok, original, sha(original), before, sha(before), after, "fixture")
+            front, back = (json.loads(x.read_text()) for x in (before, after))
+            wrong = front["panels"]["canary"][0]["query"]["read"]
+            wrong[2] = ord("X")
+            before.write_text(json.dumps(front))
+            with self.assertRaisesRegex(ValueError, "more than the whitespace placement"):
+                freeze_after(tok, original, sha(original), before, sha(before), Path(d) / "bad.json", "fixture")
+        for split, cases in back["panels"].items():
+            for new, old in zip(cases, source["panels"][split], strict=True):
+                expected = whitespace_read(tok, old["query"]["read"], len(old["query"]["apply"]))
+                self.assertEqual(new["query"]["read"], old["query"]["read"] + expected[1:13])
+                self.assertEqual(new["query"]["apply"], old["query"]["apply"])
+                self.assertEqual(new["retained"], old["retained"])
 
 
 if __name__ == "__main__":

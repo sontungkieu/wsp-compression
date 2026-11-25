@@ -509,6 +509,9 @@ checksum-pinned original score shards.
 `freeze-match --padding whitespace` inserts ordinary whitespace tokens
 after the first read token while preserving the entire read clause. Its
 separate pilot checks read accuracy before admitting the holdout.
+`freeze-after` verifies an existing before-padding panel and moves its exact
+padding block after the same read clause. The paired summary compares the
+effect of reset-conv across the two padding positions.
 The numeric parser stops at the assistant turn marker, while success still
 requires the configured EOS inside the token budget. `rescore` uses the
 original checksum-pinned rollout worker to validate archived raw traces.
