@@ -87,14 +87,14 @@ def marker_forward(runtime, packed, query, captures=(), edits=None):
     return logits[0], states, changes
 
 
-def probe(runtime, case):
+def probe(runtime, case, pulse_offset, anchors):
     torch = runtime.torch
     query = case["query"]["read"]
     width = max(len(ids) for arm in (KEEP, NONE, "fresh_record") for ids in prefixes(case, arm))
     packed = pack_at(runtime, prefixes(case, KEEP), width)
-    keep, states, _ = marker_forward(runtime, packed, query, captures=ANCHORS)
-    donor = donor_states(runtime, case, width, query)[0]
-    pulse = {0: (donor, FIELDS)}
+    keep, states, _ = marker_forward(runtime, packed, query, captures=anchors)
+    donor = donor_states(runtime, case, width, query)[pulse_offset]
+    pulse = {pulse_offset: (donor, FIELDS)}
     scores = {}
 
     def add(arm, logits, changes):
@@ -105,8 +105,8 @@ def probe(runtime, case):
         scores[arm] = {"tv": tv, "max_logit_delta": linf, "changed_layers": changes}
 
     logits, _, changes = marker_forward(runtime, packed, query, edits=pulse)
-    add(PULSE, logits, changes)
-    for anchor in ANCHORS:
+    add(f"pulse_{pulse_offset}", logits, changes)
+    for anchor in anchors:
         for name, fields in RESTORE.items():
             logits, _, changes = marker_forward(
                 runtime, packed, query, edits=pulse | {anchor: (states[anchor], fields)},
@@ -124,14 +124,16 @@ def run(args):
     if not cohort or len(cohort) != args.count:
         raise ValueError("incomplete fixed READ shard")
     rows = []
+    anchors = ANCHORS if args.pulse_offset == 0 else (17, 23)
     start = time.monotonic()
     with runtime.torch.inference_mode():
         for item in cohort:
             if time.time() >= args.deadline - 120:
                 raise TimeoutError("READ restoration probe nearing allocation deadline")
-            rows.append(probe(runtime, item))
+            rows.append(probe(runtime, item, args.pulse_offset, anchors))
     return {"protocol": PROTOCOL, "worker_sha": sha(Path(__file__)), "panel_sha256": args.panel_sha256,
-            "split": args.split, "start": args.start, "count": args.count, "anchors": ANCHORS,
+            "split": args.split, "start": args.start, "count": args.count,
+            "pulse_offset": args.pulse_offset, "anchors": anchors,
             "seconds": time.monotonic() - start, "rows": rows, **runtime.manifest}
 
 
@@ -139,16 +141,18 @@ def summarize(args):
     rows = defaultdict(dict)
     first = None
     cases = set()
-    expected = {PULSE, *(f"{offset}_{name}" for offset in ANCHORS for name in RESTORE)}
     for path, pin in zip(args.reports, args.fingerprints, strict=True):
         if sha(path) != pin:
             raise ValueError("READ restoration shard checksum changed")
         report = load(path)
         identity = {k: report[k] for k in ("protocol", "worker_sha", "panel_sha256", "split",
-                                          "checkpoint", "tokenizer_sha256", "runtime")}
+                                          "checkpoint", "tokenizer_sha256", "runtime", "anchors")}
+        identity["pulse_offset"] = report.get("pulse_offset", 0)
         if report["protocol"] != PROTOCOL or (first is not None and identity != first):
             raise ValueError("mixed READ restoration shards")
         first = identity
+        pulse_arm = f"pulse_{first['pulse_offset']}"
+        expected = {pulse_arm, *(f"{offset}_{name}" for offset in first["anchors"] for name in RESTORE)}
         if len(report["rows"]) != report["count"]:
             raise ValueError("incomplete READ restoration shard")
         for row in report["rows"]:
@@ -166,10 +170,10 @@ def summarize(args):
 
     arm_tv = {arm: mean(mean(pair) for pair in cases_by_id.values()) for arm, cases_by_id in rows.items()}
     contrasts = {}
-    for anchor in ANCHORS:
+    for anchor in first["anchors"]:
         conv = f"{anchor}_conv"
         contrasts[str(anchor)] = {
-            "pulse_minus_conv": diff(PULSE, conv),
+            "pulse_minus_conv": diff(pulse_arm, conv),
             "conv_minus_conv_matrix": diff(conv, f"{anchor}_conv_matrix"),
             "conv_minus_conv_kv": diff(conv, f"{anchor}_conv_kv"),
         }
@@ -184,6 +188,7 @@ def main():
         p.add_argument("--" + key, type=Path, required=key == "output")
     p.add_argument("--panel-sha256")
     p.add_argument("--split", choices=("canary", "eval"))
+    p.add_argument("--pulse-offset", type=int, choices=(0, 7), default=0)
     p.add_argument("--start", type=int, default=0)
     p.add_argument("--count", type=int, default=1)
     p.add_argument("--deadline", type=int)
