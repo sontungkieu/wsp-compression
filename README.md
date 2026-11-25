@@ -526,6 +526,9 @@ only after both canaries recover a recorded value with the extended READ query.
 With `--padding whitespace`, the queue also requires the frozen 16-case pilot
 to recover at least 24 of 32 READ values with EOS. Its final comparison uses
 new CPU scores derived from the original frozen raw trajectories.
+With `--padding after --before-panel PATH`, the queue moves the exact frozen
+pad after READ, uses technical canaries without an accuracy threshold, and
+compares the same holdout against the before-padding score receipts.
 `repetition_delayed_length_audit.py` verifies unchanged APPLY prefixes, seeds
 and exact continuation tokens against the original checksummed shards.
 `repetition_delayed_length_rescore.py` rechecks both archived READ/APPLY

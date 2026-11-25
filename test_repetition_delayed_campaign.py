@@ -7,6 +7,16 @@ from repetition_followup_queue import Campaign
 
 
 class DelayedCampaignTest(unittest.TestCase):
+    def test_padding_position_holdout_uses_only_the_two_technical_canaries(self):
+        root = Path("/unused")
+        jobs = jobs_for(root, root / "worker.py", root / "panel.json", root / "model",
+                        root / "data.parquet", technical_only=True)
+        tests = {"DQL-canary-000-score", "DQL-canary-001-score"}
+        self.assertFalse(any(job["lane"] == "pilot" or job["id"] == "DQL-canary-gate" for job in jobs))
+        holdout = [job for job in jobs if job["kind"] == "gpu" and job["lane"] == "eval"]
+        self.assertEqual(len(holdout), 8)
+        self.assertTrue(all(set(job["deps"]) == tests for job in holdout))
+
     def test_whitespace_holdout_waits_for_pilot_and_scores_with_corrected_archive(self):
         root = Path("/unused")
         old = (root / "old-panel.json", root / "old-worker.py",
